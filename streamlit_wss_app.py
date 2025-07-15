@@ -137,6 +137,7 @@ st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"])
 
 if video_file:
+    st.video(video_file)
     velocity_range = st.slider(
         "速度レンジ（最大血流速度, cm/s）を設定:",
         min_value=10.0,
@@ -146,96 +147,99 @@ if video_file:
         help="血流速度の最大値を調整してください。"
     )
 
-    with st.spinner("Processing video and computing WSS & Pressure..."):
-        frames = extract_frames(video_file)
-        wss_maps, centers = calculate_wss(frames)
-        velocities, pressures = calculate_pressure(frames, velocity_range)
+    if st.button("解析を実行"):
+        with st.spinner("Processing video and computing WSS & Pressure..."):
+            frames = extract_frames(video_file)
+            wss_maps, centers = calculate_wss(frames)
+            velocities, pressures = calculate_pressure(frames, velocity_range)
 
-        fig1, ax1 = plt.subplots(figsize=(6, 4))
-        time = np.arange(len(pressures)) / frame_rate
-        ax1.plot(time, pressures[:len(time)], label="Pressure", color='blue')
-        ax1.set_title("Estimated Central Pressure Over Time")
-        ax1.set_xlabel("Time [s]")
-        ax1.set_ylabel("Pressure [arb. unit]")
-        ax1.grid(True)
+            mean_wss_wall = [np.mean(wss[wss > 0]) for wss in wss_maps]
+            time = np.arange(len(pressures)) / frame_rate
 
-        fig2, ax2 = plt.subplots(figsize=(6, 4))
-        ax2.plot(mean_wss_wall := [np.mean(wss[wss > 0]) for wss in wss_maps], color='orange', marker='o')
-        ax2.set_title("Wall Shear Stress Along Vessel Wall Over Time")
-        ax2.set_xlabel("Frame")
-        ax2.set_ylabel("Mean WSS [Pa]")
-        ax2.grid(True)
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            ax1.plot(time, pressures[:len(time)], label="Pressure", color='blue')
+            ax1.set_title("Estimated Central Pressure Over Time")
+            ax1.set_xlabel("Time [s]")
+            ax1.set_ylabel("Pressure [arb. unit]")
+            ax1.grid(True)
 
-        fig4, sector_means, angle_labels = bullseye_map(wss_maps, centers)
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            ax2.plot(mean_wss_wall, color='orange', marker='o')
+            ax2.set_title("Wall Shear Stress Along Vessel Wall Over Time")
+            ax2.set_xlabel("Frame")
+            ax2.set_ylabel("Mean WSS [Pa]")
+            ax2.grid(True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(fig2)
-        with col2:
-            st.pyplot(fig1)
+            fig4, sector_means, angle_labels = bullseye_map(wss_maps, centers)
 
-        fig3, ax3 = plt.subplots(figsize=(6, 4))
-        color1 = 'tab:blue'
-        color2 = 'tab:orange'
-        ax3.set_title("Pressure vs WSS")
-        ax3.set_xlabel("Time [s]")
-        ax3.set_ylabel("Pressure [arb. unit]", color=color1)
-        ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], label="Pressure", color=color1)
-        ax3.tick_params(axis='y', labelcolor=color1)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.pyplot(fig2)
+            with col2:
+                st.pyplot(fig1)
 
-        ax4 = ax3.twinx()
-        ax4.set_ylabel("WSS [Pa]", color=color2)
-        ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color=color2)
-        ax4.tick_params(axis='y', labelcolor=color2)
+            fig3, ax3 = plt.subplots(figsize=(6, 4))
+            color1 = 'tab:blue'
+            color2 = 'tab:orange'
+            ax3.set_title("Pressure vs WSS")
+            ax3.set_xlabel("Time [s]")
+            ax3.set_ylabel("Pressure [arb. unit]", color=color1)
+            ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], label="Pressure", color=color1)
+            ax3.tick_params(axis='y', labelcolor=color1)
 
-        fig3.tight_layout()
+            ax4 = ax3.twinx()
+            ax4.set_ylabel("WSS [Pa]", color=color2)
+            ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color=color2)
+            ax4.tick_params(axis='y', labelcolor=color2)
 
-        col3, col4 = st.columns(2)
-        with col3:
-            st.pyplot(fig3)
-        with col4:
-            st.pyplot(fig4)
+            fig3.tight_layout()
 
-        summary = generate_summary(pressures, mean_wss_wall)
-        st.subheader("💡 Summary")
-        st.info(summary)
+            col3, col4 = st.columns(2)
+            with col3:
+                st.pyplot(fig3)
+            with col4:
+                st.pyplot(fig4)
 
-        max_val = np.max(mean_wss_wall)
-        min_val = np.min(mean_wss_wall)
-        max_idx = np.argmax(mean_wss_wall)
-        peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
-        peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+            summary = generate_summary(pressures, mean_wss_wall)
+            st.subheader("💡 Summary")
+            st.info(summary)
 
-        st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
-        if peak_range:
-            st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
+            max_val = np.max(mean_wss_wall)
+            min_val = np.min(mean_wss_wall)
+            max_idx = np.argmax(mean_wss_wall)
+            peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
+            peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
 
-        highest_idx = int(np.argmax(sector_means))
-        highest_val = np.max(sector_means)
-        st.markdown(f"**Highest segment:** {angle_labels[highest_idx]} with average WSS = **{highest_val:.2f} Pa**")
-        st.info(f"🔴 WSSが最も高かったのは {angle_labels[highest_idx]} 方向です。血流が集中している可能性があります。")
+            st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
+            if peak_range:
+                st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-        st.success("Analysis complete.")
+            highest_idx = int(np.argmax(sector_means))
+            highest_val = np.max(sector_means)
+            st.markdown(f"**Highest segment:** {angle_labels[highest_idx]} with average WSS = **{highest_val:.2f} Pa**")
+            st.info(f"🔴 WSSが最も高かったのは {angle_labels[highest_idx]} 方向です。血流が集中している可能性があります。")
 
-        with st.expander("🧐 医工学的な重要ポイントの解説（クリックで展開）"):
-            st.markdown("""
+            st.success("Analysis complete.")
+
+            with st.expander("🧠 医工学的な重要ポイントの解説（クリックで展開）"):
+                st.markdown("""
 - **内圧とWSSが同時に上昇する時間帯**は、**狭窄や血流の局所集中が疑われる重要ポイント**です。
 - **WSSのみが上昇している場合**は、血流が局所的に偏っており、血管壁への**摩染的ストレスが増大**していることを示します。
 - **内圧のみ上昇している場合**は、血管壁の**弾性低下や外的圧迫**の可能性があり、流速は比較的安定していると考えられます。
 """)
 
-        with st.expander("📸 高WSSが観察されたフレーム"):
-            for idx in peaks:
-                st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
-
-        threshold_p = np.mean(pressures) + np.std(pressures)
-        threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
-        suspect_frames = [i for i in range(len(mean_wss_wall))
-                          if pressures[i] > threshold_p and mean_wss_wall[i] > threshold_w]
-
-        if suspect_frames:
-            with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
-                for idx in suspect_frames:
+            with st.expander("📸 高WSSが観察されたフレーム"):
+                for idx in peaks:
                     st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
-        else:
-            st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
+
+            threshold_p = np.mean(pressures) + np.std(pressures)
+            threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
+            suspect_frames = [i for i in range(len(mean_wss_wall))
+                              if pressures[i] > threshold_p and mean_wss_wall[i] > threshold_w]
+
+            if suspect_frames:
+                with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
+                    for idx in suspect_frames:
+                        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+            else:
+                st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
