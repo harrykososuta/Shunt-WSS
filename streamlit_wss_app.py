@@ -244,4 +244,4 @@ if video_file:
                     for idx in limited_frames:
                         st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
             else:
-            st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
+                st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
