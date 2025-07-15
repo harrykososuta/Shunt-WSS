@@ -17,7 +17,6 @@ n_angles = 360
 r_max = 30
 n_segments = 18
 frame_rate = 30.0
-velocity_range = 76.0  # cm/s
 
 # --- Utility Functions ---
 def extract_red_mask(image_rgb):
@@ -102,7 +101,7 @@ def bullseye_map(wss_maps, centers):
     plt.tight_layout()
     return fig, sector_means, angle_labels
 
-def calculate_pressure(frames):
+def calculate_pressure(frames, velocity_range):
     mean_velocities = []
     for frame in frames:
         mask = extract_red_mask(frame)
@@ -133,15 +132,24 @@ def generate_summary(pressures, mean_wss_wall):
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
-st.title("🧠 Vessel Wall Pressure & Shear Stress Evaluation")
+st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
 video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"])
 
 if video_file:
+    velocity_range = st.slider(
+        "速度レンジ（最大血流速度, cm/s）を設定:",
+        min_value=10.0,
+        max_value=200.0,
+        value=76.0,
+        step=1.0,
+        help="血流速度の最大値を調整してください。"
+    )
+
     with st.spinner("Processing video and computing WSS & Pressure..."):
         frames = extract_frames(video_file)
         wss_maps, centers = calculate_wss(frames)
-        velocities, pressures = calculate_pressure(frames)
+        velocities, pressures = calculate_pressure(frames, velocity_range)
 
         fig1, ax1 = plt.subplots(figsize=(6, 4))
         time = np.arange(len(pressures)) / frame_rate
@@ -209,20 +217,17 @@ if video_file:
 
         st.success("Analysis complete.")
 
-        # --- 解説ボタン ---
-        with st.expander("🧠 医工学的な重要ポイントの解説（クリックで展開）"):
+        with st.expander("🧐 医工学的な重要ポイントの解説（クリックで展開）"):
             st.markdown("""
 - **内圧とWSSが同時に上昇する時間帯**は、**狭窄や血流の局所集中が疑われる重要ポイント**です。
 - **WSSのみが上昇している場合**は、血流が局所的に偏っており、血管壁への**摩染的ストレスが増大**していることを示します。
 - **内圧のみ上昇している場合**は、血管壁の**弾性低下や外的圧迫**の可能性があり、流速は比較的安定していると考えられます。
 """)
 
-        # --- 高WSSフレームの表示 ---
         with st.expander("📸 高WSSが観察されたフレーム"):
             for idx in peaks:
                 st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
 
-        # --- WSSとPressure両方高いフレーム ---
         threshold_p = np.mean(pressures) + np.std(pressures)
         threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
         suspect_frames = [i for i in range(len(mean_wss_wall))
