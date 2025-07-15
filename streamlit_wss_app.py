@@ -229,9 +229,9 @@ if video_file:
 """)
 
             with st.expander("📸 高WSSが観察されたフレーム"):
-    top_peaks = sorted(peaks, key=lambda i: mean_wss_wall[i], reverse=True)[:3]
-    for idx in top_peaks:
-        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+                top_peaks = sorted(peaks, key=lambda i: mean_wss_wall[i], reverse=True)[:3]
+                for idx in top_peaks:
+                    st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
 
             threshold_p = np.mean(pressures) + np.std(pressures)
             threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
@@ -239,9 +239,9 @@ if video_file:
                               if pressures[i] > threshold_p and mean_wss_wall[i] > threshold_w]
 
             if suspect_frames:
-    with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
-        limited_frames = sorted(suspect_frames, key=lambda i: mean_wss_wall[i] + pressures[i], reverse=True)[:5]
-        for idx in limited_frames:
-            st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
-            else:
-                st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
+            with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
+                limited_frames = sorted(suspect_frames, key=lambda i: mean_wss_wall[i] + pressures[i], reverse=True)[:5]
+                for idx in limited_frames:
+                    st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+        else:
+            st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
