@@ -8,7 +8,6 @@ from scipy.ndimage import map_coordinates
 from PIL import Image
 import tempfile
 from scipy.signal import find_peaks
-from scipy.stats import pearsonr
 
 # --- Parameters ---
 mu = 0.0035
@@ -103,11 +102,109 @@ def bullseye_map(wss_maps, centers):
     plt.tight_layout()
     return fig, sector_means, angle_labels
 
+def calculate_pressure(frames):
+    mean_velocities = []
+    for frame in frames:
+        mask = extract_red_mask(frame)
+        red_intensity = frame[..., 0]
+        mean_value = np.mean(red_intensity[mask]) if np.any(mask) else 0
+        mean_velocities.append(mean_value)
+
+    max_red = max(mean_velocities) if max(mean_velocities) > 0 else 1
+    velocities = [(v / max_red) * velocity_range for v in mean_velocities]
+    A = np.pi * (0.25)**2  # cm^2
+    Z = 1.0
+    pressures = [Z * A * v for v in velocities]
+    return velocities, pressures
+
+def generate_summary(pressures, mean_wss_wall):
+    mean_pressure = np.mean(pressures)
+    peak_pressure = np.max(pressures)
+    mean_wss = np.mean(mean_wss_wall)
+    peak_wss = np.max(mean_wss_wall)
+    if peak_pressure > 1.2 * mean_pressure and peak_wss > 1.2 * mean_wss:
+        return "この箇所に内圧上昇箇所が見られます。WSSも上昇しているので狭窄が疑われます。"
+    elif peak_pressure > 1.2 * mean_pressure:
+        return "内圧の上昇が観察されましたが、WSSの変化は限定的です。弾性変化の可能性があります。"
+    elif peak_wss > 1.2 * mean_wss:
+        return "WSSの上昇が観察されました。流速分布の局所的集中により負荷がかかっている可能性があります。"
+    else:
+        return "顕著な内圧やWSSの異常は観察されませんでした。"
+
 # --- Streamlit UI ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧠 Vessel Wall Pressure & Shear Stress Evaluation")
 
-st.markdown("""
-このアプリケーションでは、短軸心エコー動画から血管壁に作用する壁せん断応力（WSS）と中心内圧（推定値）を解析し、
-その時系列的変化・空間的分布を視覚的に評価することができます。
-""")
+video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"])
+
+if video_file:
+    with st.spinner("Processing video and computing WSS & Pressure..."):
+        frames = extract_frames(video_file)
+        wss_maps, centers = calculate_wss(frames)
+        velocities, pressures = calculate_pressure(frames)
+
+        fig1, ax1 = plt.subplots(figsize=(6, 4))
+        time = np.arange(len(pressures)) / frame_rate
+        ax1.plot(time, pressures[:len(time)], label="Pressure", color='blue')
+        ax1.set_title("Estimated Central Pressure Over Time")
+        ax1.set_xlabel("Time [s]")
+        ax1.set_ylabel("Pressure [arb. unit]")
+        ax1.grid(True)
+
+        fig2, ax2 = plt.subplots(figsize=(6, 4))
+        ax2.plot(mean_wss_wall := [np.mean(wss[wss > 0]) for wss in wss_maps], color='orange', marker='o')
+        ax2.set_title("Wall Shear Stress Along Vessel Wall Over Time")
+        ax2.set_xlabel("Frame")
+        ax2.set_ylabel("Mean WSS [Pa]")
+        ax2.grid(True)
+
+        fig4, sector_means, angle_labels = bullseye_map(wss_maps, centers)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.pyplot(fig2)
+        with col2:
+            st.pyplot(fig1)
+
+        fig3, ax3 = plt.subplots(figsize=(6, 4))
+        color1 = 'tab:blue'
+        color2 = 'tab:orange'
+        ax3.set_title("Pressure vs WSS")
+        ax3.set_xlabel("Time [s]")
+        ax3.set_ylabel("Pressure [arb. unit]", color=color1)
+        ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], label="Pressure", color=color1)
+        ax3.tick_params(axis='y', labelcolor=color1)
+
+        ax4 = ax3.twinx()
+        ax4.set_ylabel("WSS [Pa]", color=color2)
+        ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color=color2)
+        ax4.tick_params(axis='y', labelcolor=color2)
+
+        fig3.tight_layout()
+
+        col3, col4 = st.columns(2)
+        with col3:
+            st.pyplot(fig3)
+        with col4:
+            st.pyplot(fig4)
+
+        summary = generate_summary(pressures, mean_wss_wall)
+        st.subheader("💡 Summary")
+        st.info(summary)
+
+        max_val = np.max(mean_wss_wall)
+        min_val = np.min(mean_wss_wall)
+        max_idx = np.argmax(mean_wss_wall)
+        peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
+        peak_range = f"{peaks[0]/frame_rate:.2f}s～{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+
+        st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
+        if peak_range:
+            st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
+
+        highest_idx = int(np.argmax(sector_means))
+        highest_val = np.max(sector_means)
+        st.markdown(f"**Highest segment:** {angle_labels[highest_idx]} with average WSS = **{highest_val:.2f} Pa**")
+        st.info(f"🔴 WSSが最も高かったのは {angle_labels[highest_idx]} 方向です。血流が集中している可能性があります。")
+
+        st.success("Analysis complete.")
