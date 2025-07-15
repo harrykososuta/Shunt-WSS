@@ -8,6 +8,7 @@ from scipy.ndimage import map_coordinates
 from PIL import Image
 import tempfile
 from scipy.signal import find_peaks
+from scipy.stats import pearsonr
 
 # --- Parameters ---
 mu = 0.0035
@@ -68,6 +69,40 @@ def calculate_wss(frames):
         wss_maps.append(wss_masked)
     return wss_maps, centers
 
+def bullseye_map(wss_maps, centers):
+    wss_polar = np.zeros((len(wss_maps), n_angles))
+    for t, wss in enumerate(wss_maps):
+        cx, cy = centers[t]
+        for j, theta in enumerate(np.linspace(0, 2 * np.pi, n_angles, endpoint=False)):
+            r_vals = np.linspace(5, r_max, num=20)
+            x_coords = cx + r_vals * np.cos(theta)
+            y_coords = cy + r_vals * np.sin(theta)
+            coords = np.vstack([y_coords, x_coords])
+            values = map_coordinates(wss, coords, order=1, mode='constant', cval=0.0)
+            wss_polar[t, j] = np.nanmean(values)
+
+    sector_angles = np.linspace(0, 360, n_segments + 1)
+    theta = np.linspace(0, 2 * np.pi, n_segments, endpoint=False)
+    sector_means = []
+    angle_labels = []
+    for i in range(n_segments):
+        indices = np.arange(int(sector_angles[i]), int(sector_angles[i + 1])) % 360
+        sector_means.append(np.nanmean(wss_polar[:, indices]))
+        angle_labels.append(f"{int(sector_angles[i])}°–{int(sector_angles[i+1])}°")
+
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    bars = ax.bar(theta, sector_means, width=2 * np.pi / n_segments, bottom=0,
+                  color=plt.cm.jet((np.array(sector_means) - np.min(sector_means)) /
+                                   (np.max(sector_means) - np.min(sector_means))))
+    for i, (angle, val) in enumerate(zip(theta, sector_means)):
+        ax.text(angle, val + 0.005, f"{angle_labels[i]}\n{val:.1f}", ha='center', va='bottom', fontsize=7)
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_yticklabels([])
+    ax.set_title("Bull's Eye WSS Map (18 Segments)", va='bottom')
+    plt.tight_layout()
+    return fig, sector_means, angle_labels
+
 def calculate_pressure(frames):
     mean_velocities = []
     for frame in frames:
@@ -118,11 +153,14 @@ if video_file:
         ax1.grid(True)
 
         fig2, ax2 = plt.subplots(figsize=(6, 4))
-        ax2.plot(mean_wss_wall := [np.mean(wss[wss > 0]) for wss in wss_maps], color='orange', marker='o')
+        mean_wss_wall = [np.mean(wss[wss > 0]) for wss in wss_maps]
+        ax2.plot(mean_wss_wall, color='orange', marker='o')
         ax2.set_title("Wall Shear Stress Along Vessel Wall Over Time")
         ax2.set_xlabel("Frame")
         ax2.set_ylabel("Mean WSS [Pa]")
         ax2.grid(True)
+
+        fig4, sector_means, angle_labels = bullseye_map(wss_maps, centers)
 
         col1, col2 = st.columns(2)
         with col1:
@@ -131,30 +169,50 @@ if video_file:
             st.pyplot(fig1)
 
         fig3, ax3 = plt.subplots(figsize=(6, 4))
-        ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], label="Pressure", color='blue')
-        ax3.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color='orange')
-        ax3.set_xlabel("Time [s]")
+        color1 = 'tab:blue'
+        color2 = 'tab:orange'
         ax3.set_title("Pressure vs WSS")
-        ax3.legend()
-        ax3.grid(True)
+        ax3.set_xlabel("Time [s]")
+        ax3.set_ylabel("Pressure [arb. unit]", color=color1)
+        ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], label="Pressure", color=color1)
+        ax3.tick_params(axis='y', labelcolor=color1)
+
+        ax4 = ax3.twinx()
+        ax4.set_ylabel("WSS [Pa]", color=color2)
+        ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color=color2)
+        ax4.tick_params(axis='y', labelcolor=color2)
+
+        fig3.tight_layout()
 
         col3, col4 = st.columns(2)
         with col3:
             st.pyplot(fig3)
+        with col4:
+            st.pyplot(fig4)
 
         summary = generate_summary(pressures, mean_wss_wall)
-        with col4:
-            st.subheader("💡 Summary")
-            st.info(summary)
+        st.subheader("💡 Summary")
+        st.info(summary)
 
         max_val = np.max(mean_wss_wall)
         min_val = np.min(mean_wss_wall)
         max_idx = np.argmax(mean_wss_wall)
         peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
-        peak_range = f"{peaks[0]/frame_rate:.2f}s～{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+        peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
 
         st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
         if peak_range:
             st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-        st.success("Analysis complete.")
+        highest_idx = int(np.argmax(sector_means))
+        highest_val = np.max(sector_means)
+        st.markdown(f"**Highest segment:** {angle_labels[highest_idx]} with average WSS = **{highest_val:.2f} Pa**")
+        st.info(f"🔴 WSSが最も高かったのは {angle_labels[highest_idx]} 方向です。血流が集中している可能性があります。")
+
+        # --- Correlation ---
+        corr, _ = pearsonr(pressures[:len(mean_wss_wall)], mean_wss_wall)
+        st.markdown(f"**Pearson Correlation (Pressure vs WSS):** {corr:.2f}")
+        if corr > 0.7:
+            st.success("WSSと内圧の間に強い相関が見られます。血流動態は整っています。")
+        elif corr < 0.3:
+            st.warning("WSSと内圧の相関が低く、局所的な狭窄や流速不均一が疑われます。")
