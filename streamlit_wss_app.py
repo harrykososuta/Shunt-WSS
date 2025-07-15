@@ -196,7 +196,7 @@ if video_file:
         min_val = np.min(mean_wss_wall)
         max_idx = np.argmax(mean_wss_wall)
         peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
-        peak_range = f"{peaks[0]/frame_rate:.2f}s～{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+        peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
 
         st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
         if peak_range:
@@ -208,3 +208,29 @@ if video_file:
         st.info(f"🔴 WSSが最も高かったのは {angle_labels[highest_idx]} 方向です。血流が集中している可能性があります。")
 
         st.success("Analysis complete.")
+
+        # --- 解説ボタン ---
+        with st.expander("🧠 医工学的な重要ポイントの解説（クリックで展開）"):
+            st.markdown("""
+- **内圧とWSSが同時に上昇する時間帯**は、**狭窄や血流の局所集中が疑われる重要ポイント**です。
+- **WSSのみが上昇している場合**は、血流が局所的に偏っており、血管壁への**摩染的ストレスが増大**していることを示します。
+- **内圧のみ上昇している場合**は、血管壁の**弾性低下や外的圧迫**の可能性があり、流速は比較的安定していると考えられます。
+""")
+
+        # --- 高WSSフレームの表示 ---
+        with st.expander("📸 高WSSが観察されたフレーム"):
+            for idx in peaks:
+                st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+
+        # --- WSSとPressure両方高いフレーム ---
+        threshold_p = np.mean(pressures) + np.std(pressures)
+        threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
+        suspect_frames = [i for i in range(len(mean_wss_wall))
+                          if pressures[i] > threshold_p and mean_wss_wall[i] > threshold_w]
+
+        if suspect_frames:
+            with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
+                for idx in suspect_frames:
+                    st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+        else:
+            st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
