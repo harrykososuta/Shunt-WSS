@@ -229,8 +229,9 @@ if video_file:
 """)
 
             with st.expander("📸 高WSSが観察されたフレーム"):
-                for idx in peaks:
-                    st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+    top_peaks = sorted(peaks, key=lambda i: mean_wss_wall[i], reverse=True)[:3]
+    for idx in top_peaks:
+        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
 
             threshold_p = np.mean(pressures) + np.std(pressures)
             threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
