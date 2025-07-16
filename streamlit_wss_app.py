@@ -503,11 +503,3 @@ if video_file:
                         st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
             else:
                 st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
-                  # --- CSV出力 ---
-                results_df = pd.DataFrame({
-                    "Frame": list(range(len(mean_wss_wall))),
-                    "Time [s]": time[:len(mean_wss_wall)],
-                    "Pressure [arb. unit]": pressures[:len(mean_wss_wall)],
-                    "Mean WSS [Pa]": mean_wss_wall
-                })
-                st.download_button("📅 CSVをダウンロード", data=results_df.to_csv(index=False), file_name="WSS_vs_Pressure_Output.csv", mime="text/csv")
