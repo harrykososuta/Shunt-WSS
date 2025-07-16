@@ -142,8 +142,8 @@ if video_file:
     velocity_range = st.slider(
         "速度レンジ（最大血流速度, cm/s）を設定:",
         min_value=10.0,
-        max_value=200.0,
-        value=76.0,
+        max_value=120.0,
+        value=50.0,
         step=1.0,
         help="血流速度の最大値を調整してください。"
     )
