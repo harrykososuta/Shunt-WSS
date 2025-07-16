@@ -8,7 +8,7 @@ from scipy.ndimage import map_coordinates
 from PIL import Image
 import tempfile
 from scipy.signal import find_peaks
-import pandas as pd  # ← CSV出力に必要
+import pandas as pd  # CSV出力用
 
 # --- Parameters ---
 mu = 0.0035
