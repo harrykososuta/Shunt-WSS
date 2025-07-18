@@ -116,7 +116,7 @@ def summarize_case(wss, pressure):
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
-st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
+st.title("🤭 Vessel Wall Pressure & Shear Stress Evaluation")
 
 video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"])
 
@@ -253,7 +253,6 @@ if video_file:
                 "コメント": comment
             }])
 
-            st.markdown("---")
             with st.container():
                 st.subheader("📋 結果のCSV出力")
                 st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
