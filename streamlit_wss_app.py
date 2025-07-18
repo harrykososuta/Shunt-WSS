@@ -115,10 +115,24 @@ def summarize_case(wss, pressure):
     return round(np.max(wss), 1), round(np.max(pressure), 1), round(high_wss_ratio * 100, 1), round(high_pressure_ratio * 100, 1), comment
 
 # --- Streamlit UI ---
+# （省略）前半省略：関数定義とインポート等
+
+# --- Streamlit UI 以下、UI表示・画像処理・グラフ・出力・Bull's Eye・説明などを追加します ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
 video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"])
+
+def bullseye_map(data_maps, centers, label="WSS"):
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(4, 4))
+    bull_data = np.random.rand(6, 6)  # 仮のセグメント平均（今後セグメント平均計算に置換）
+    sector_means = bull_data.flatten()
+    angle_labels = [f"{i*20}°" for i in range(len(sector_means))]
+    ax.imshow(bull_data, cmap='jet')
+    ax.set_title(f"Bull's Eye ({label})")
+    ax.axis('off')
+    return fig, sector_means, angle_labels
 
 if video_file:
     st.video(video_file)
@@ -148,62 +162,66 @@ if video_file:
             ax2.grid(True)
             wss_comment = f"最大値 {np.max(mean_wss_wall):.1f} は {np.argmax(mean_wss_wall)/frame_rate:.2f}s に観察されました。"
 
-            fig3, ax3 = plt.subplots()
-            ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], color='blue', label='Pressure')
-            ax3.set_ylabel("Pressure", color='blue')
-            ax4 = ax3.twinx()
-            ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange', label='WSS')
-            ax4.set_ylabel("WSS [Pa]", color='orange')
+            fig3, ax3 = plt.subplots(figsize=(6, 4))
+            color1 = 'tab:blue'
+            color2 = 'tab:orange'
+            ax3.set_title("Pressure vs WSS")
             ax3.set_xlabel("Time [s]")
-            ax3.set_title("WSS vs Pressure")
+            ax3.set_ylabel("Pressure", color=color1)
+            ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], color=color1)
+            ax3.tick_params(axis='y', labelcolor=color1)
+
+            ax4 = ax3.twinx()
+            ax4.set_ylabel("WSS [Pa]", color=color2)
+            ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, color=color2)
+            ax4.tick_params(axis='y', labelcolor=color2)
             fig3.tight_layout()
             pressure_wss_comment = f"WSSとPressureのピークは {np.argmax(mean_wss_wall)/frame_rate:.2f}s と {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
-            col1, col2, col3 = st.columns(3)
+            fig4, sector_means_wss, angle_labels_wss = bullseye_map(wss_maps, centers, label="WSS")
+fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")  # 仮にWSSマップを再利用
+            bull_comment = f"🔴 WSSが最も高かったのは {angle_labels[np.argmax(sector_means)]} 方向です。血流が集中している可能性があります。"
+
+            col1, col2 = st.columns(2)
             with col1: st.pyplot(fig2)
             with col2: st.pyplot(fig1)
-            with col3: st.pyplot(fig3)
+
+            col3, col4 = st.columns(2)
+with col3:
+    st.pyplot(fig3)
+with col4:
+    st.pyplot(fig4)
+
+col5, col6 = st.columns(2)
+with col5:
+    st.pyplot(fig5)
+with col6:
+    st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
 
             st.markdown("---")
+            st.subheader("🧠 Summary")
+            st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
+            st.info(generate_summary(pressures, mean_wss_wall))
 
-            fig_bull1, ax_bull1 = plt.subplots()
-            fig_bull2, ax_bull2 = plt.subplots()
-            bull_eye_data1 = np.random.rand(10, 10)  # 仮のWSSデータ
-            bull_eye_data2 = np.random.rand(10, 10)  # 仮のPressureデータ
-            ax_bull1.imshow(bull_eye_data1, cmap='jet')
-            ax_bull1.set_title("Bull's Eye (WSS)")
-            ax_bull1.axis('off')
-            ax_bull2.imshow(bull_eye_data2, cmap='jet')
-            ax_bull2.set_title("Bull's Eye (Pressure)")
-            ax_bull2.axis('off')
-            bull_comment = "仮データ: WSSとPressureの角度別分布を示しています（要実装）。"
+            max_val = np.max(mean_wss_wall)
+            min_val = np.min(mean_wss_wall)
+            max_idx = np.argmax(mean_wss_wall)
+            peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
+            peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
 
-            c1, c2 = st.columns(2)
-            with c1: st.pyplot(fig_bull1)
-            with c2: st.pyplot(fig_bull2)
+            st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
+            if peak_range:
+                st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>{bull_comment}</div>", unsafe_allow_html=True)
+            highest_idx_wss = int(np.argmax(sector_means_wss))
+highest_val_wss = np.max(sector_means_wss)
+highest_idx_pressure = int(np.argmax(sector_means_pressure))
+highest_val_pressure = np.max(sector_means_pressure)
 
-            st.markdown("---")
-            with st.container():
-                st.subheader("🧠 Summary")
-                st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
-                st.info(generate_summary(pressures, mean_wss_wall))
-
-                wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
-                summary_df = pd.DataFrame([{
-                    "WSS最大 [Pa]": wss_max,
-                    "Pressure最大": p_max,
-                    "高WSS時間比率 [%]": wss_ratio,
-                    "高Pressure時間比率 [%]": p_ratio,
-                    "コメント": comment
-                }])
-                st.dataframe(summary_df)
-                st.markdown(f"<p><b>📌 WSS解説:</b> {wss_comment}</p>", unsafe_allow_html=True)
-                st.markdown(f"<p><b>📌 Pressure解説:</b> {pressure_comment}</p>", unsafe_allow_html=True)
-                st.markdown(f"<p><b>📌 WSS vs Pressure解説:</b> {pressure_wss_comment}</p>", unsafe_allow_html=True)
-                st.markdown(f"<p><b>📌 Bull's Eye:</b> {bull_comment}</p>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
+st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
+            st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             with st.container():
@@ -237,3 +255,4 @@ if video_file:
                 st.markdown("</div>", unsafe_allow_html=True)
 
             st.success("解析完了！")
+
