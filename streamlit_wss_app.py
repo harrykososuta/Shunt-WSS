@@ -138,6 +138,7 @@ if video_file:
             ax1.set_xlabel("Time [s]")
             ax1.set_ylabel("Pressure")
             ax1.grid(True)
+            pressure_comment = f"最大値 {np.max(pressures):.1f} は {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             fig2, ax2 = plt.subplots()
             ax2.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange')
@@ -145,6 +146,7 @@ if video_file:
             ax2.set_xlabel("Time [s]")
             ax2.set_ylabel("WSS [Pa]")
             ax2.grid(True)
+            wss_comment = f"最大値 {np.max(mean_wss_wall):.1f} は {np.argmax(mean_wss_wall)/frame_rate:.2f}s に観察されました。"
 
             fig3, ax3 = plt.subplots()
             ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], color='blue', label='Pressure')
@@ -155,6 +157,7 @@ if video_file:
             ax3.set_xlabel("Time [s]")
             ax3.set_title("WSS vs Pressure")
             fig3.tight_layout()
+            pressure_wss_comment = f"WSSとPressureのピークは {np.argmax(mean_wss_wall)/frame_rate:.2f}s と {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             col1, col2, col3 = st.columns(3)
             with col1: st.pyplot(fig2)
@@ -163,18 +166,23 @@ if video_file:
 
             st.markdown("---")
 
-            bull_fig, bull_ax = plt.subplots()
-            bull_ax.imshow(np.random.rand(10,10), cmap='jet')
-            bull_ax.set_title("Bull's Eye (仮表示)")
-            bull_ax.axis('off')
+            fig_bull1, ax_bull1 = plt.subplots()
+            fig_bull2, ax_bull2 = plt.subplots()
+            bull_eye_data1 = np.random.rand(10, 10)  # 仮のWSSデータ
+            bull_eye_data2 = np.random.rand(10, 10)  # 仮のPressureデータ
+            ax_bull1.imshow(bull_eye_data1, cmap='jet')
+            ax_bull1.set_title("Bull's Eye (WSS)")
+            ax_bull1.axis('off')
+            ax_bull2.imshow(bull_eye_data2, cmap='jet')
+            ax_bull2.set_title("Bull's Eye (Pressure)")
+            ax_bull2.axis('off')
+            bull_comment = "仮データ: WSSとPressureの角度別分布を示しています（要実装）。"
 
-            left, right = st.columns([2, 1])
-            with left:
-                st.pyplot(bull_fig)
-            with right:
-                with st.expander("🧬 WSSとPressureの説明"):
-                    st.markdown("**WSS (Wall Shear Stress)** は血管内皮細胞にかかるずり応力です。高WSSは内皮障害や病変進行に関連します。")
-                    st.markdown("**Pressure** は内圧で、血管抵抗や血流速度に影響されます。高内圧は血管の負担を増加させ、病態進行のリスクとなります。")
+            c1, c2 = st.columns(2)
+            with c1: st.pyplot(fig_bull1)
+            with c2: st.pyplot(fig_bull2)
+
+            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>{bull_comment}</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             with st.container():
@@ -191,6 +199,10 @@ if video_file:
                     "コメント": comment
                 }])
                 st.dataframe(summary_df)
+                st.markdown(f"<p><b>📌 WSS解説:</b> {wss_comment}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><b>📌 Pressure解説:</b> {pressure_comment}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><b>📌 WSS vs Pressure解説:</b> {pressure_wss_comment}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p><b>📌 Bull's Eye:</b> {bull_comment}</p>", unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
