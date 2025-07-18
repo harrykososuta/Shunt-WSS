@@ -122,13 +122,41 @@ video_file = st.file_uploader("Upload Short-Axis Echo Video (MP4)", type=["mp4"]
 
 def bullseye_map(data_maps, centers, label="WSS"):
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(4, 4))
-    bull_data = np.random.rand(6, 6)  # 仮のセグメント平均（今後セグメント平均計算に置換）
-    sector_means = bull_data.flatten()
-    angle_labels = [f"{i*20}°" for i in range(len(sector_means))]
-    ax.imshow(bull_data, cmap='jet')
-    ax.set_title(f"Bull's Eye ({label})")
-    ax.axis('off')
+    import matplotlib as mpl
+
+    num_rings = 3
+    num_sectors = 6
+    sector_means = np.random.rand(num_rings * num_sectors)  # 仮データ（将来セグメント平均に置換）
+    angle_labels = [f"{i*60}°" for i in range(num_rings * num_sectors)]
+
+    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    width = 2 * np.pi / num_sectors
+
+    for r in range(num_rings):
+        inner_radius = r / num_rings
+        outer_radius = (r + 1) / num_rings
+        for t in range(num_sectors):
+            idx = r * num_sectors + t
+            theta = t * width
+            value = sector_means[idx]
+            color = plt.cm.jet(value)
+            ax.bar(
+                x=theta,
+                height=outer_radius - inner_radius,
+                width=width,
+                bottom=inner_radius,
+                color=color,
+                edgecolor='white',
+                linewidth=1,
+                align='edge'
+            )
+
+    ax.set_yticklabels([])
+    ax.set_xticklabels([])
+    ax.set_title(f"Bull's Eye ({label})", fontsize=14)
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+
     return fig, sector_means, angle_labels
 
 if video_file:
@@ -178,24 +206,46 @@ if video_file:
             fig4, sector_means_wss, angle_labels_wss = bullseye_map(wss_maps, centers, label="WSS")
             fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")
 
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 st.pyplot(fig2)
             with col2:
                 st.pyplot(fig1)
-
-            col3, col4 = st.columns(2)
             with col3:
                 st.pyplot(fig3)
+
+            col4, col5 = st.columns(2)
             with col4:
                 st.pyplot(fig4)
-
-            col5, col6 = st.columns(2)
             with col5:
                 st.pyplot(fig5)
-            with col6:
-                st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
-                st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
+
+            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.subheader("🧠 Summary")
+            st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
+            st.info(generate_summary(pressures, mean_wss_wall))
+
+            max_val = np.max(mean_wss_wall)
+            min_val = np.min(mean_wss_wall)
+            max_idx = np.argmax(mean_wss_wall)
+            peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
+            peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+
+            st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
+            if peak_range:
+                st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
+
+            highest_idx_wss = int(np.argmax(sector_means_wss))
+            highest_val_wss = np.max(sector_means_wss)
+            highest_idx_pressure = int(np.argmax(sector_means_pressure))
+            highest_val_pressure = np.max(sector_means_pressure)
+
+            st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
+            st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
+            st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             st.subheader("🧠 Summary")
