@@ -177,7 +177,6 @@ if video_file:
             ax1.set_xlabel("Time [s]")
             ax1.set_ylabel("Pressure")
             ax1.grid(True)
-            pressure_comment = f"最大値 {np.max(pressures):.1f} は {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             fig2, ax2 = plt.subplots()
             ax2.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange')
@@ -185,7 +184,6 @@ if video_file:
             ax2.set_xlabel("Time [s]")
             ax2.set_ylabel("WSS [Pa]")
             ax2.grid(True)
-            wss_comment = f"最大値 {np.max(mean_wss_wall):.1f} は {np.argmax(mean_wss_wall)/frame_rate:.2f}s に観察されました。"
 
             fig3, ax3 = plt.subplots(figsize=(6, 4))
             color1 = 'tab:blue'
@@ -201,7 +199,6 @@ if video_file:
             ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, color=color2)
             ax4.tick_params(axis='y', labelcolor=color2)
             fig3.tight_layout()
-            pressure_wss_comment = f"WSSとPressureのピークは {np.argmax(mean_wss_wall)/frame_rate:.2f}s と {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             fig4, sector_means_wss, angle_labels_wss = bullseye_map(wss_maps, centers, label="WSS")
             fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")
@@ -248,10 +245,17 @@ if video_file:
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
-           
             with st.container():
                 st.subheader("📋 結果のCSV出力")
                 st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
+
+                # summary_df の作成（修正点）
+                summary_df = pd.DataFrame({
+                    "Time [s]": time[:len(mean_wss_wall)],
+                    "Pressure": pressures[:len(mean_wss_wall)],
+                    "WSS [Pa]": mean_wss_wall
+                })
+
                 csv = summary_df.to_csv(index=False).encode('utf-8')
                 st.download_button("CSVとして保存", data=csv, file_name="case_summary.csv", mime="text/csv")
 
