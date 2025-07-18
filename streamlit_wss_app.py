@@ -225,6 +225,9 @@ if video_file:
             st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
             st.info(generate_summary(pressures, mean_wss_wall))
 
+            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
+            st.info(f"🗒️ コメント: {comment}")
+
             max_val = np.max(mean_wss_wall)
             min_val = np.min(mean_wss_wall)
             max_idx = np.argmax(mean_wss_wall)
@@ -244,7 +247,6 @@ if video_file:
             st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
             st.markdown("</div>", unsafe_allow_html=True)
 
-            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
             summary_df = pd.DataFrame([{
                 "WSS最大 [Pa]": wss_max,
                 "Pressure最大": p_max,
