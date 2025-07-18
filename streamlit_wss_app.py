@@ -132,7 +132,6 @@ if video_file:
             mean_wss_wall = [np.mean(wss[wss > 0]) for wss in wss_maps]
             time = np.arange(len(pressures)) / frame_rate
 
-            # --- グラフ表示 ---
             fig1, ax1 = plt.subplots()
             ax1.plot(time, pressures[:len(time)], label="Pressure", color='blue')
             ax1.set_title("Pressure vs Time")
@@ -163,21 +162,66 @@ if video_file:
             with col3: st.pyplot(fig3)
 
             st.markdown("---")
-            st.subheader("🧠 Summary")
-            st.info(generate_summary(pressures, mean_wss_wall))
 
-            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
-            summary_df = pd.DataFrame([{
-                "WSS最大 [Pa]": wss_max,
-                "Pressure最大": p_max,
-                "高WSS時間比率 [%]": wss_ratio,
-                "高Pressure時間比率 [%]": p_ratio,
-                "コメント": comment
-            }])
+            bull_fig, bull_ax = plt.subplots()
+            bull_ax.imshow(np.random.rand(10,10), cmap='jet')
+            bull_ax.set_title("Bull's Eye (仮表示)")
+            bull_ax.axis('off')
 
-            with st.expander("📋 症例サマリー出力"):
+            left, right = st.columns([2, 1])
+            with left:
+                st.pyplot(bull_fig)
+            with right:
+                with st.expander("🧬 WSSとPressureの説明"):
+                    st.markdown("**WSS (Wall Shear Stress)** は血管内皮細胞にかかるずり応力です。高WSSは内皮障害や病変進行に関連します。")
+                    st.markdown("**Pressure** は内圧で、血管抵抗や血流速度に影響されます。高内圧は血管の負担を増加させ、病態進行のリスクとなります。")
+
+            st.markdown("---")
+            with st.container():
+                st.subheader("🧠 Summary")
+                st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
+                st.info(generate_summary(pressures, mean_wss_wall))
+
+                wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
+                summary_df = pd.DataFrame([{
+                    "WSS最大 [Pa]": wss_max,
+                    "Pressure最大": p_max,
+                    "高WSS時間比率 [%]": wss_ratio,
+                    "高Pressure時間比率 [%]": p_ratio,
+                    "コメント": comment
+                }])
                 st.dataframe(summary_df)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+            with st.container():
+                st.subheader("📋 結果のCSV出力")
+                st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
                 csv = summary_df.to_csv(index=False).encode('utf-8')
                 st.download_button("CSVとして保存", data=csv, file_name="case_summary.csv", mime="text/csv")
+
+                threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
+                threshold_p = np.mean(pressures) + np.std(pressures)
+                peaks_w = sorted(range(len(mean_wss_wall)), key=lambda i: mean_wss_wall[i], reverse=True)[:3]
+                peaks_p = sorted(range(len(pressures)), key=lambda i: pressures[i], reverse=True)[:3]
+
+                with st.expander("📸 高WSSが観察されたフレーム"):
+                    for idx in peaks_w:
+                        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+
+                with st.expander("📸 高Pressureが観察されたフレーム"):
+                    for idx in peaks_p:
+                        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+
+                suspect_frames = [i for i in range(len(mean_wss_wall))
+                                  if pressures[i] > threshold_p and mean_wss_wall[i] > threshold_w]
+                if suspect_frames:
+                    with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
+                        limited_frames = sorted(suspect_frames, key=lambda i: mean_wss_wall[i] + pressures[i], reverse=True)[:5]
+                        for idx in limited_frames:
+                            st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+                else:
+                    st.info("⚠️ 内圧とWSSが同時に高かったフレームは検出されませんでした。")
+                st.markdown("</div>", unsafe_allow_html=True)
 
             st.success("解析完了！")
