@@ -129,7 +129,7 @@ def bullseye_map(data_maps, centers, label="WSS"):
     sector_means = np.random.rand(num_rings * num_sectors)  # 仮データ（将来セグメント平均に置換）
     angle_labels = [f"{i*60}°" for i in range(num_rings * num_sectors)]
 
-    fig, ax = plt.subplots(figsize=(5, 5), subplot_kw=dict(polar=True))
+    fig, ax = plt.subplots(figsize=(3.5, 3.5), subplot_kw=dict(polar=True))  # サイズ縮小
     width = 2 * np.pi / num_sectors
 
     for r in range(num_rings):
@@ -153,7 +153,7 @@ def bullseye_map(data_maps, centers, label="WSS"):
 
     ax.set_yticklabels([])
     ax.set_xticklabels([])
-    ax.set_title(f"Bull's Eye ({label})", fontsize=14)
+    ax.set_title(f"Bull's Eye ({label})", fontsize=12)
     ax.set_theta_zero_location('N')
     ax.set_theta_direction(-1)
 
@@ -223,7 +223,8 @@ if video_file:
             st.markdown("---")
             st.subheader("🧠 Summary")
             st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
-            st.info(generate_summary(pressures, mean_wss_wall))
+            summary_comment = generate_summary(pressures, mean_wss_wall)
+            st.info(summary_comment)
 
             wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
             st.info(f"🗒️ コメント: {comment}")
@@ -245,6 +246,10 @@ if video_file:
 
             st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
             st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
+            st.markdown(f"- フレーム数: {len(frames)}")
+            st.markdown(f"- フレームレート: {frame_rate} fps")
+            st.markdown(f"- ピクセルサイズ: {pixel_size_m * 1e4:.2f} μm")
+            st.markdown(f"- 血流速度レンジ: {velocity_range} cm/s")
             st.markdown("</div>", unsafe_allow_html=True)
 
             summary_df = pd.DataFrame([{
