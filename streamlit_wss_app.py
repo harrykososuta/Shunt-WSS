@@ -221,35 +221,44 @@ if video_file:
             st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
 
             st.markdown("---")
-            st.subheader("🧠 Summary")
+             st.subheader("🧐 Summary")
             st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
+
+            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
             summary_comment = generate_summary(pressures, mean_wss_wall)
             st.info(summary_comment)
 
-            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
-            st.info(f"🗒️ コメント: {comment}")
+            st.markdown("### 🔶 判読: WSS")
+            st.pyplot(fig2)
+            st.markdown(f"**Highest WSS:** {np.max(mean_wss_wall):.2f} Pa at frame {np.argmax(mean_wss_wall)}")
 
-            max_val = np.max(mean_wss_wall)
-            min_val = np.min(mean_wss_wall)
-            max_idx = np.argmax(mean_wss_wall)
-            peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
-            peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
+            st.markdown("### 🔷 判読: Pressure")
+            st.pyplot(fig1)
+            st.markdown(f"**Highest Pressure:** {np.max(pressures):.2f} unit at frame {np.argmax(pressures)}")
 
-            st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
-            if peak_range:
-                st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
+            st.markdown("### 🔸 判読: WSS と Pressure の関係")
+            st.pyplot(fig3)
+            st.markdown(f"**WSS and Pressure correlation peak:** frame {np.argmax(np.array(mean_wss_wall) + np.array(pressures))}")
 
-            highest_idx_wss = int(np.argmax(sector_means_wss))
-            highest_val_wss = np.max(sector_means_wss)
-            highest_idx_pressure = int(np.argmax(sector_means_pressure))
-            highest_val_pressure = np.max(sector_means_pressure)
+            st.markdown("### 🎯 Bull's Eye Map 判読")
+            col4, col5 = st.columns(2)
+            with col4:
+                st.pyplot(fig4)
+                st.markdown(f"**Highest WSS segment:** {angle_labels_wss[np.argmax(sector_means_wss)]} → 平均WSS = {np.max(sector_means_wss):.2f} Pa")
+            with col5:
+                st.pyplot(fig5)
+                st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[np.argmax(sector_means_pressure)]} → 平均Pressure = {np.max(sector_means_pressure):.2f} unit")
 
-            st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
-            st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
+            st.markdown("### 📄 コメント")
+            severity_color = "#f28b82" if "狭窄" in comment else ("#fff475" if "可能性" in comment else "#ccff90")
+            st.markdown(f"<div style='background-color:{severity_color}; padding:10px; border-radius:8px;'>🗒️ コメント: {comment}</div>", unsafe_allow_html=True)
+
+            st.markdown("---")
+            st.markdown("### ℹ️ パラメータ情報")
             st.markdown(f"- フレーム数: {len(frames)}")
             st.markdown(f"- フレームレート: {frame_rate} fps")
             st.markdown(f"- ピクセルサイズ: {pixel_size_m * 1e4:.2f} μm")
-            st.markdown(f"- 血流速度レンジ: {velocity_range} cm/s")
+            st.markdown(f"- 血流速度レンジ: {velocity_range:.1f} cm/s")
             st.markdown("</div>", unsafe_allow_html=True)
 
             summary_df = pd.DataFrame([{
