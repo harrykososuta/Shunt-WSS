@@ -115,9 +115,6 @@ def summarize_case(wss, pressure):
     return round(np.max(wss), 1), round(np.max(pressure), 1), round(high_wss_ratio * 100, 1), round(high_pressure_ratio * 100, 1), comment
 
 # --- Streamlit UI ---
-# （省略）前半省略：関数定義とインポート等
-
-# --- Streamlit UI 以下、UI表示・画像処理・グラフ・出力・Bull's Eye・説明などを追加します ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
