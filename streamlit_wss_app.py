@@ -45,6 +45,33 @@ def extract_frames(video_bytes):
     cap.release()
     return frames
 
+def calculate_wss(frames):
+    gray_frames = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY), (0, 0), fx=resize_scale, fy=resize_scale)
+                   for f in frames]
+    wss_maps = []
+    centers = []
+    for i in range(len(gray_frames) - 1):
+        mask = extract_red_mask(frames[i])
+        mask_small = cv2.resize(mask.astype(np.uint8), (gray_frames[i].shape[1], gray_frames[i].shape[0])) > 0
+        coords = np.column_stack(np.where(mask))
+        if coords.size == 0:
+            centers.append((gray_frames[i].shape[1] // 2, gray_frames[i].shape[0] // 2))
+            wss_maps.append(np.zeros_like(gray_frames[i], dtype=np.float32))
+            continue
+        cy, cx = np.mean(coords, axis=0).astype(int)
+        cy = int(cy * resize_scale)
+        cx = int(cx * resize_scale)
+        centers.append((cx, cy))
+        flow = cv2.calcOpticalFlowFarneback(gray_frames[i], gray_frames[i + 1], None,
+                                            0.5, 3, 15, 3, 5, 1.2, 0)
+        du_dx = cv2.Sobel(flow[..., 0], cv2.CV_32F, 1, 0, ksize=3)
+        dv_dy = cv2.Sobel(flow[..., 1], cv2.CV_32F, 0, 1, ksize=3)
+        grad_mag = np.sqrt(du_dx ** 2 + dv_dy ** 2)
+        wss_map = mu * grad_mag / pixel_size_m
+        wss_masked = np.where(mask_small, wss_map, 0)
+        wss_maps.append(wss_masked)
+    return wss_maps, centers
+
 # --- Bull's Eye Plot ---
 def bullseye_map(wss_maps, centers):
     wss_polar = np.zeros((len(wss_maps), n_angles))
