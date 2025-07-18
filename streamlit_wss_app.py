@@ -115,6 +115,9 @@ def summarize_case(wss, pressure):
     return round(np.max(wss), 1), round(np.max(pressure), 1), round(high_wss_ratio * 100, 1), round(high_pressure_ratio * 100, 1), comment
 
 # --- Streamlit UI ---
+# （省略）前半省略：関数定義とインポート等
+
+# --- Streamlit UI 以下、UI表示・画像処理・グラフ・出力・Bull's Eye・説明などを追加します ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
@@ -176,7 +179,7 @@ if video_file:
             pressure_wss_comment = f"WSSとPressureのピークは {np.argmax(mean_wss_wall)/frame_rate:.2f}s と {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             fig4, sector_means_wss, angle_labels_wss = bullseye_map(wss_maps, centers, label="WSS")
-fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")  # 仮にWSSマップを再利用
+            fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")  # 仮にWSSマップを再利用
             bull_comment = f"🔴 WSSが最も高かったのは {angle_labels[np.argmax(sector_means)]} 方向です。血流が集中している可能性があります。"
 
             col1, col2 = st.columns(2)
@@ -185,16 +188,16 @@ fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, cent
 
             col3, col4 = st.columns(2)
 with col3:
-    st.pyplot(fig3)
-with col4:
-    st.pyplot(fig4)
+            st.pyplot(fig3)
+        with col4:
+            st.pyplot(fig4)
 
 col5, col6 = st.columns(2)
 with col5:
-    st.pyplot(fig5)
-with col6:
-    st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
+            st.pyplot(fig5)
+        with col6:
+            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             st.subheader("🧠 Summary")
@@ -211,13 +214,13 @@ with col6:
             if peak_range:
                 st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-            highest_idx_wss = int(np.argmax(sector_means_wss))
-highest_val_wss = np.max(sector_means_wss)
-highest_idx_pressure = int(np.argmax(sector_means_pressure))
-highest_val_pressure = np.max(sector_means_pressure)
+                        highest_idx_wss = int(np.argmax(sector_means_wss))
+            highest_val_wss = np.max(sector_means_wss)
+            highest_idx_pressure = int(np.argmax(sector_means_pressure))
+            highest_val_pressure = np.max(sector_means_pressure)
 
-st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
-st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
+            st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
+            st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
@@ -252,4 +255,3 @@ st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_p
                 st.markdown("</div>", unsafe_allow_html=True)
 
             st.success("解析完了！")
-
