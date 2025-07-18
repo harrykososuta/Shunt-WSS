@@ -45,76 +45,57 @@ def extract_frames(video_bytes):
     cap.release()
     return frames
 
-def calculate_wss(frames):
-    gray_frames = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY), (0, 0), fx=resize_scale, fy=resize_scale)
-                   for f in frames]
-    wss_maps = []
-    centers = []
-    for i in range(len(gray_frames) - 1):
-        mask = extract_red_mask(frames[i])
-        mask_small = cv2.resize(mask.astype(np.uint8), (gray_frames[i].shape[1], gray_frames[i].shape[0])) > 0
-        coords = np.column_stack(np.where(mask))
-        cy, cx = np.mean(coords, axis=0).astype(int)
-        cy = int(cy * resize_scale)
-        cx = int(cx * resize_scale)
-        centers.append((cx, cy))
-        flow = cv2.calcOpticalFlowFarneback(gray_frames[i], gray_frames[i + 1], None,
-                                            0.5, 3, 15, 3, 5, 1.2, 0)
-        du_dx = cv2.Sobel(flow[..., 0], cv2.CV_32F, 1, 0, ksize=3)
-        dv_dy = cv2.Sobel(flow[..., 1], cv2.CV_32F, 0, 1, ksize=3)
-        grad_mag = np.sqrt(du_dx ** 2 + dv_dy ** 2)
-        wss_map = mu * grad_mag / pixel_size_m
-        wss_masked = np.where(mask_small, wss_map, 0)
-        wss_maps.append(wss_masked)
-    return wss_maps, centers
+# --- Bull's Eye Plot ---
+def bullseye_map(wss_maps, centers):
+    wss_polar = np.zeros((len(wss_maps), n_angles))
+    for t, wss in enumerate(wss_maps):
+        cx, cy = centers[t]
+        for j, theta in enumerate(np.linspace(0, 2 * np.pi, n_angles, endpoint=False)):
+            r_vals = np.linspace(5, r_max, num=20)
+            x_coords = cx + r_vals * np.cos(theta)
+            y_coords = cy + r_vals * np.sin(theta)
+            coords = np.vstack([y_coords, x_coords])
+            values = map_coordinates(wss, coords, order=1, mode='constant', cval=0.0)
+            wss_polar[t, j] = np.nanmean(values)
 
-def calculate_pressure(frames, velocity_range):
-    mean_velocities = []
-    for frame in frames:
-        mask = extract_red_mask(frame)
-        red_intensity = frame[..., 0]
-        mean_value = np.mean(red_intensity[mask]) if np.any(mask) else 0
-        mean_velocities.append(mean_value)
+    sector_angles = np.linspace(0, 360, n_segments + 1)
+    theta = np.linspace(0, 2 * np.pi, n_segments, endpoint=False)
+    sector_means = []
+    angle_labels = []
+    for i in range(n_segments):
+        indices = np.arange(int(sector_angles[i]), int(sector_angles[i + 1])) % 360
+        sector_means.append(np.nanmean(wss_polar[:, indices]))
+        angle_labels.append(f"{int(sector_angles[i])}°–{int(sector_angles[i+1])}°")
 
-    max_red = max(mean_velocities) if max(mean_velocities) > 0 else 1
-    velocities = [(v / max_red) * velocity_range for v in mean_velocities]
-    A = np.pi * (0.25)**2  # cm^2
-    Z = 1.0
-    pressures = [Z * A * v for v in velocities]
-    return velocities, pressures
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    bars = ax.bar(theta, sector_means, width=2 * np.pi / n_segments, bottom=0,
+                  color=plt.cm.jet((np.array(sector_means) - np.min(sector_means)) /
+                                   (np.max(sector_means) - np.min(sector_means))))
+    ax.set_title("Bull's Eye WSS Map (18 Segments)", va='bottom')
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_yticklabels([])
+    plt.tight_layout()
+    return fig
 
-def generate_summary(pressures, mean_wss_wall):
-    mean_pressure = np.mean(pressures)
-    peak_pressure = np.max(pressures)
-    mean_wss = np.mean(mean_wss_wall)
-    peak_wss = np.max(mean_wss_wall)
-    if peak_pressure > 1.2 * mean_pressure and peak_wss > 1.2 * mean_wss:
-        return "この箇所に内圧上昇箇所が見られます。WSSも上昇しているので狭窄が疑われます。"
-    elif peak_pressure > 1.2 * mean_pressure:
-        return "内圧の上昇が観察されましたが、WSSの変化は限定的です。弾性変化の可能性があります。"
-    elif peak_wss > 1.2 * mean_wss:
-        return "WSSの上昇が観察されました。流速分布の局所的集中により負荷がかかっている可能性があります。"
-    else:
-        return "顕著な内圧やWSSの異常は観察されませんでした。"
-
-def summarize_case(wss, pressure):
-    high_wss_threshold = np.mean(wss) + np.std(wss)
-    high_pressure_threshold = np.mean(pressure) + np.std(pressure)
-    high_wss_ratio = np.sum(wss > high_wss_threshold) / len(wss)
-    high_pressure_ratio = np.sum(pressure > high_pressure_threshold) / len(pressure)
-
+# --- Score Summary Helper ---
+def generate_score_summary(wss, pressure):
+    wss_thresh = np.mean(wss) + np.std(wss)
+    pressure_thresh = np.mean(pressure) + np.std(pressure)
+    high_wss_ratio = np.sum(wss > wss_thresh) / len(wss)
+    high_pressure_ratio = np.sum(pressure > pressure_thresh) / len(pressure)
     if high_wss_ratio > 0.15 and high_pressure_ratio > 0.15:
-        comment = "狭窄の疑いが強い"
-    elif high_wss_ratio > 0.15:
-        comment = "WSSの負荷が局所的に集中"
-    elif high_pressure_ratio > 0.15:
-        comment = "血管抵抗の上昇の可能性"
+        score = 5
+        comment = "高度狭窄の疑い"
+    elif high_wss_ratio > 0.15 or high_pressure_ratio > 0.15:
+        score = 3
+        comment = "中等度狭窄の可能性"
     else:
-        comment = "大きな異常は見られない"
+        score = 1
+        comment = "狭窄の可能性は低い"
+    return score, comment
 
-    return round(np.max(wss), 1), round(np.max(pressure), 1), round(high_wss_ratio * 100, 1), round(high_pressure_ratio * 100, 1), comment
-
-# --- Streamlit UI ---
+# --- UI Layout ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
@@ -132,26 +113,24 @@ if video_file:
             mean_wss_wall = [np.mean(wss[wss > 0]) for wss in wss_maps]
             time = np.arange(len(pressures)) / frame_rate
 
-            # --- グラフ表示 ---
+            # グラフ
             fig1, ax1 = plt.subplots()
             ax1.plot(time, pressures[:len(time)], label="Pressure", color='blue')
-            ax1.set_title("Pressure vs Time")
             ax1.set_xlabel("Time [s]")
             ax1.set_ylabel("Pressure")
-            ax1.grid(True)
+            ax1.set_title("Pressure vs Time")
 
             fig2, ax2 = plt.subplots()
-            ax2.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange')
-            ax2.set_title("WSS vs Time")
+            ax2.plot(time[:len(mean_wss_wall)], mean_wss_wall, label="WSS", color='orange')
             ax2.set_xlabel("Time [s]")
             ax2.set_ylabel("WSS [Pa]")
-            ax2.grid(True)
+            ax2.set_title("WSS vs Time")
 
             fig3, ax3 = plt.subplots()
-            ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], color='blue', label='Pressure')
+            ax3.plot(time[:len(mean_wss_wall)], pressures[:len(mean_wss_wall)], color='blue')
             ax3.set_ylabel("Pressure", color='blue')
             ax4 = ax3.twinx()
-            ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange', label='WSS')
+            ax4.plot(time[:len(mean_wss_wall)], mean_wss_wall, color='orange')
             ax4.set_ylabel("WSS [Pa]", color='orange')
             ax3.set_xlabel("Time [s]")
             ax3.set_title("WSS vs Pressure")
@@ -162,22 +141,64 @@ if video_file:
             with col2: st.pyplot(fig1)
             with col3: st.pyplot(fig3)
 
-            st.markdown("---")
-            st.subheader("🧠 Summary")
-            st.info(generate_summary(pressures, mean_wss_wall))
+            # Bull's Eye
+            fig4 = bullseye_map(wss_maps, centers)
+            col4, col5 = st.columns([2, 1])
+            with col4:
+                st.pyplot(fig4)
+            with col5:
+                st.markdown("""
+                ### WSSとは？
+                血管内皮細胞にかかるずり応力。高いと内皮障害やリモデリングに関連。
 
-            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
-            summary_df = pd.DataFrame([{
-                "WSS最大 [Pa]": wss_max,
-                "Pressure最大": p_max,
-                "高WSS時間比率 [%]": wss_ratio,
-                "高Pressure時間比率 [%]": p_ratio,
-                "コメント": comment
-            }])
+                ### Pressureとは？
+                血管内腔の内圧を表す指標。上昇は抵抗増加や狭窄を示唆。
+                """)
+                with st.expander("🧠 医工学的な重要ポイントの解説"):
+                    st.markdown("""
+                    - **内圧とWSSが同時に上昇する時間帯**は、**狭窄や血流の局所集中が疑われる重要ポイント**です。
+                    - **WSSのみが上昇している場合**は、血流が局所的に偏っており、血管壁への**摩染的ストレスが増大**していることを示します。
+                    - **内圧のみ上昇している場合**は、血管壁の**弾性低下や外的圧迫**の可能性があります。
+                    """)
 
-            with st.expander("📋 症例サマリー出力"):
-                st.dataframe(summary_df)
-                csv = summary_df.to_csv(index=False).encode('utf-8')
-                st.download_button("CSVとして保存", data=csv, file_name="case_summary.csv", mime="text/csv")
+            # Summary Score
+            with st.container():
+                st.subheader("📊 Summary & Score")
+                score, comment = generate_score_summary(mean_wss_wall, pressures)
+                st.markdown(f"**Score:** {score} / 5")
+                st.info(comment)
 
-            st.success("解析完了！")
+            # 結果CSV & 高値フレーム
+            threshold_w = np.mean(mean_wss_wall) + np.std(mean_wss_wall)
+            threshold_p = np.mean(pressures) + np.std(pressures)
+
+            results_df = pd.DataFrame({
+                "Time [s]": time[:len(mean_wss_wall)],
+                "Pressure [arb. unit]": pressures[:len(mean_wss_wall)],
+                "Mean WSS [Pa]": mean_wss_wall
+            })
+
+            with st.container():
+                st.subheader("⬇️ 結果のCSV出力")
+                st.download_button("📄 CSVをダウンロード", data=results_df.to_csv(index=False), file_name="WSS_vs_Pressure_Output.csv", mime="text/csv")
+
+                with st.expander("📸 高WSSが観察されたフレーム"):
+                    peaks, _ = find_peaks(mean_wss_wall, height=threshold_w)
+                    top_wss_frames = sorted(peaks, key=lambda i: mean_wss_wall[i], reverse=True)[:3]
+                    for idx in top_wss_frames:
+                        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+
+                with st.expander("📸 高Pressureが観察されたフレーム"):
+                    peaks_p, _ = find_peaks(pressures, height=threshold_p)
+                    top_pressure_frames = sorted(peaks_p, key=lambda i: pressures[i], reverse=True)[:3]
+                    for idx in top_pressure_frames:
+                        st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+
+                with st.expander("⚠️ WSSとPressureが同時に高かったフレーム（狭窄の可能性）"):
+                    both_high = [i for i in range(len(mean_wss_wall)) if mean_wss_wall[i] > threshold_w and pressures[i] > threshold_p]
+                    top_both = sorted(both_high, key=lambda i: mean_wss_wall[i] + pressures[i], reverse=True)[:3]
+                    if top_both:
+                        for idx in top_both:
+                            st.image(frames[idx], caption=f"Frame {idx} – {idx/frame_rate:.2f}s", use_column_width=True)
+                    else:
+                        st.info("該当するフレームは検出されませんでした。")
