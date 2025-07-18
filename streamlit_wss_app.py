@@ -248,30 +248,7 @@ if video_file:
             st.markdown("</div>", unsafe_allow_html=True)
 
             st.markdown("---")
-            st.subheader("🧠 Summary")
-            st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
-            st.info(generate_summary(pressures, mean_wss_wall))
-
-            max_val = np.max(mean_wss_wall)
-            min_val = np.min(mean_wss_wall)
-            max_idx = np.argmax(mean_wss_wall)
-            peaks, _ = find_peaks(mean_wss_wall, height=np.mean(mean_wss_wall) + np.std(mean_wss_wall))
-            peak_range = f"{peaks[0]/frame_rate:.2f}s〜{peaks[-1]/frame_rate:.2f}s" if len(peaks) > 0 else ""
-
-            st.markdown(f"**Highest WSS:** {max_val:.2f} Pa at frame {max_idx} / **Lowest WSS:** {min_val:.2f} Pa")
-            if peak_range:
-                st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
-
-            highest_idx_wss = int(np.argmax(sector_means_wss))
-            highest_val_wss = np.max(sector_means_wss)
-            highest_idx_pressure = int(np.argmax(sector_means_pressure))
-            highest_val_pressure = np.max(sector_means_pressure)
-
-            st.markdown(f"**Highest WSS segment:** {angle_labels_wss[highest_idx_wss]} → 平均WSS = {highest_val_wss:.2f} Pa")
-            st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            st.markdown("---")
+           
             with st.container():
                 st.subheader("📋 結果のCSV出力")
                 st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
