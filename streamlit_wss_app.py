@@ -176,20 +176,21 @@ if video_file:
             pressure_wss_comment = f"WSSとPressureのピークは {np.argmax(mean_wss_wall)/frame_rate:.2f}s と {np.argmax(pressures)/frame_rate:.2f}s に観察されました。"
 
             fig4, sector_means_wss, angle_labels_wss = bullseye_map(wss_maps, centers, label="WSS")
-            fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")  # 仮にWSSマップを再利用
-            bull_comment = f"🔴 WSSが最も高かったのは {angle_labels[np.argmax(sector_means)]} 方向です。血流が集中している可能性があります。"
+            fig5, sector_means_pressure, angle_labels_pressure = bullseye_map(wss_maps, centers, label="Pressure")
 
             col1, col2 = st.columns(2)
-            with col1: st.pyplot(fig2)
-            with col2: st.pyplot(fig1)
+            with col1:
+                st.pyplot(fig2)
+            with col2:
+                st.pyplot(fig1)
 
-                                    col3, col4 = st.columns(2)
+            col3, col4 = st.columns(2)
             with col3:
                 st.pyplot(fig3)
             with col4:
                 st.pyplot(fig4)
 
-                        col5, col6 = st.columns(2)
+            col5, col6 = st.columns(2)
             with col5:
                 st.pyplot(fig5)
             with col6:
