@@ -115,9 +115,6 @@ def summarize_case(wss, pressure):
     return round(np.max(wss), 1), round(np.max(pressure), 1), round(high_wss_ratio * 100, 1), round(high_pressure_ratio * 100, 1), comment
 
 # --- Streamlit UI ---
-# （省略）前半省略：関数定義とインポート等
-
-# --- Streamlit UI 以下、UI表示・画像処理・グラフ・出力・Bull's Eye・説明などを追加します ---
 st.set_page_config(page_title="Vessel Wall Dynamics Analyzer", layout="wide")
 st.title("🧐 Vessel Wall Pressure & Shear Stress Evaluation")
 
@@ -186,14 +183,14 @@ if video_file:
             with col1: st.pyplot(fig2)
             with col2: st.pyplot(fig1)
 
-            col3, col4 = st.columns(2)
-with col3:
+                        col3, col4 = st.columns(2)
+            with col3:
             st.pyplot(fig3)
         with col4:
             st.pyplot(fig4)
 
-col5, col6 = st.columns(2)
-with col5:
+            col5, col6 = st.columns(2)
+            with col5:
             st.pyplot(fig5)
         with col6:
             st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
@@ -214,7 +211,7 @@ with col5:
             if peak_range:
                 st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-                        highest_idx_wss = int(np.argmax(sector_means_wss))
+                                    highest_idx_wss = int(np.argmax(sector_means_wss))
             highest_val_wss = np.max(sector_means_wss)
             highest_idx_pressure = int(np.argmax(sector_means_pressure))
             highest_val_pressure = np.max(sector_means_pressure)
