@@ -244,17 +244,19 @@ if video_file:
             st.markdown(f"**Highest Pressure segment:** {angle_labels_pressure[highest_idx_pressure]} → 平均Pressure = {highest_val_pressure:.2f} unit")
             st.markdown("</div>", unsafe_allow_html=True)
 
+            wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
+            summary_df = pd.DataFrame([{
+                "WSS最大 [Pa]": wss_max,
+                "Pressure最大": p_max,
+                "高WSS時間比率 [%]": wss_ratio,
+                "高Pressure時間比率 [%]": p_ratio,
+                "コメント": comment
+            }])
+
             st.markdown("---")
             with st.container():
                 st.subheader("📋 結果のCSV出力")
                 st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
-
-                # summary_df の作成（修正点）
-                summary_df = pd.DataFrame({
-                    "Time [s]": time[:len(mean_wss_wall)],
-                    "Pressure": pressures[:len(mean_wss_wall)],
-                    "WSS [Pa]": mean_wss_wall
-                })
 
                 csv = summary_df.to_csv(index=False).encode('utf-8')
                 st.download_button("CSVとして保存", data=csv, file_name="case_summary.csv", mime="text/csv")
