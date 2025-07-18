@@ -183,18 +183,18 @@ if video_file:
             with col1: st.pyplot(fig2)
             with col2: st.pyplot(fig1)
 
-                        col3, col4 = st.columns(2)
+                                    col3, col4 = st.columns(2)
             with col3:
-            st.pyplot(fig3)
-        with col4:
-            st.pyplot(fig4)
+                st.pyplot(fig3)
+            with col4:
+                st.pyplot(fig4)
 
-            col5, col6 = st.columns(2)
+                        col5, col6 = st.columns(2)
             with col5:
-            st.pyplot(fig5)
-        with col6:
-            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
+                st.pyplot(fig5)
+            with col6:
+                st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔴 WSSが最も高かったのは {angle_labels_wss[np.argmax(sector_means_wss)]} 方向です。</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
 
             st.markdown("---")
             st.subheader("🧠 Summary")
@@ -211,7 +211,7 @@ if video_file:
             if peak_range:
                 st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-                                    highest_idx_wss = int(np.argmax(sector_means_wss))
+                                                highest_idx_wss = int(np.argmax(sector_means_wss))
             highest_val_wss = np.max(sector_means_wss)
             highest_idx_pressure = int(np.argmax(sector_means_pressure))
             highest_val_pressure = np.max(sector_means_pressure)
