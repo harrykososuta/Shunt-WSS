@@ -212,7 +212,7 @@ if video_file:
             if peak_range:
                 st.info(f"🟠 WSSが最も高いのは frame {max_idx}（{max_val:.1f} Pa）です。高値は次の時間帯でも見られます：{peak_range}。")
 
-                                                highest_idx_wss = int(np.argmax(sector_means_wss))
+            highest_idx_wss = int(np.argmax(sector_means_wss))
             highest_val_wss = np.max(sector_means_wss)
             highest_idx_pressure = int(np.argmax(sector_means_pressure))
             highest_val_pressure = np.max(sector_means_pressure)
