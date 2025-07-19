@@ -96,13 +96,23 @@ def summarize_case(wss, pressure):
     thp = np.mean(pressure) + np.std(pressure)
     hw = np.sum(np.array(wss) > thw) / len(wss)
     hp = np.sum(np.array(pressure) > thp) / len(pressure)
-    if hw > 0.15 and hp > 0.15:
-        return round(np.max(wss),1), round(np.max(pressure),1), round(hw*100,1), round(hp*100,1), "狭窄の疑いが強い"
-    if hw > 0.15:
-        return round(np.max(wss),1), round(np.max(pressure),1), round(hw*100,1), round(hp*100,1), "WSSに負荷集中"
-    if hp > 0.15:
-        return round(np.max(wss),1), round(np.max(pressure),1), round(hw*100,1), round(hp*100,1), "圧力増加の可能性"
-    return round(np.max(wss),1), round(np.max(pressure),1), round(hw*100,1), round(hp*100,1), "異常なし"
+
+    if hw == 0 or hp == 0:
+        comment = "データ不足の可能性あり"
+    elif hw > 0.25 and hp > 0.25:
+        comment = "重度の狭窄の疑い"
+    elif hw > 0.25:
+        comment = "WSS極端に高い"
+    elif hp > 0.25:
+        comment = "Pressure極端に高い"
+    elif hw > 0.15 or hp > 0.15:
+        comment = "中等度の上昇傾向"
+    elif hw > 0.10 or hp > 0.10:
+        comment = "軽度の上昇傾向"
+    else:
+        comment = "異常なし"
+
+    return round(np.max(wss), 1), round(np.max(pressure), 1), round(hw * 100, 1), round(hp * 100, 1), comment
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="Vessel WSS & Pressure Analyzer", layout="wide")
