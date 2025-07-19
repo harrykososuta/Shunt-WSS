@@ -32,24 +32,28 @@ def extract_frames(video_file):
     return frames
 
 def calculate_wss(frames):
-    gray = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY), (0,0), fx=resize_scale, fy=resize_scale)
-            for f in frames]
+    gray = [cv2.resize(cv2.cvtColor(f, cv2.COLOR_RGB2GRAY),
+                       (0,0), fx=resize_scale, fy=resize_scale) for f in frames]
     wss_maps = []
     for i in range(len(gray)-1):
         mask = extract_red_mask(frames[i])
-        small = cv2.resize(mask.astype(np.uint8), (gray[i].shape[1], gray[i].shape[0])) > 0
-        flow = cv2.calcOpticalFlowFarneback(gray[i], gray[i+1], None, 0.5,3,15,3,5,1.2,0)
-        du = cv2.Sobel(flow[...,0], cv2.CV_32F, 1, 0, 3)
-        dv = cv2.Sobel(flow[...,1], cv2.CV_32F, 0, 1, 3)
-        wss_maps.append(np.where(small, mu * np.sqrt(du**2 + dv**2) / pixel_size_m, 0))
+        small = cv2.resize(mask.astype(np.uint8),
+                           (gray[i].shape[1], gray[i].shape[0])) > 0
+        flow = cv2.calcOpticalFlowFarneback(gray[i], gray[i+1], None,
+                                            0.5,3,15,3,5,1.2,0)
+        du = cv2.Sobel(flow[...,0], cv2.CV_32F,1,0,3)
+        dv = cv2.Sobel(flow[...,1], cv2.CV_32F,0,1,3)
+        wss_maps.append(np.where(small,
+                                 mu * np.sqrt(du**2 + dv**2) / pixel_size_m, 0))
     return wss_maps
 
 def calculate_pressure(frames, vmax):
-    reds = [(frame[...,0][extract_red_mask(frame)].mean() if extract_red_mask(frame).any() else 0)
-            for frame in frames]
+    reds = [(frame[...,0][extract_red_mask(frame)].mean()
+             if extract_red_mask(frame).any() else 0) for frame in frames]
     M = max(reds) or 1
     vels = [(r / M) * vmax for r in reds]
-    return vels, [np.pi * (0.25)**2 * v for v in vels]
+    pressures = [np.pi * (0.25)**2 * v for v in vels]
+    return vels, pressures
 
 def bullseye_map_highlight(vals, title, cmap='jet'):
     sectors = 12
@@ -66,7 +70,8 @@ def bullseye_map_highlight(vals, title, cmap='jet'):
         else:
             norm = (v - np.nanmin(arr)) / (np.nanmax(arr) - np.nanmin(arr) + 1e-6)
             color = plt.get_cmap(cmap)(norm)
-        ax.bar(theta, 0.2, width=width, bottom=0.8, color=color, edgecolor='black', linewidth=0.8)
+        ax.bar(theta, 0.2, width=width, bottom=0.8,
+               color=color, edgecolor='black', linewidth=0.8)
     ax.set_xticks(np.linspace(0, 2*np.pi, sectors, endpoint=False))
     ax.set_xticklabels([f"{i*30}°" for i in range(sectors)])
     ax.set_yticks([]); ax.set_title(title)
@@ -104,6 +109,7 @@ st.set_page_config(page_title="Vessel WSS & Pressure Analyzer", layout="wide")
 st.title("Vessel Wall Pressure & Shear Stress Evaluation")
 
 video = st.file_uploader("動画をアップロード（MP4）", type="mp4")
+
 if video:
     st.video(video)
     vmax = st.slider("速度レンジ（cm/s）", 10.0, 120.0, 50.0)
@@ -115,13 +121,15 @@ if video:
             mean_wss = np.array([np.nanmean(w) for w in wss_maps])
             time = np.arange(len(pressures)) / frame_rate
 
-            # -- グラフ --
+            # グラフ表示
             fig_w, axw = plt.subplots()
             axw.plot(time[:len(mean_wss)], mean_wss, color='orange')
             axw.set_title("WSS vs Time")
+
             fig_p, axp = plt.subplots()
             axp.plot(time, pressures, color='blue')
             axp.set_title("Pressure vs Time")
+
             fig_pw, axpw = plt.subplots()
             axpw.plot(time[:len(mean_wss)], pressures[:len(mean_wss)], 'b-')
             axpw2 = axpw.twinx()
@@ -135,6 +143,7 @@ if video:
             st.subheader("📈 計測グラフ")
             c1, c2, c3 = st.columns(3)
             c1.pyplot(fig_w); c2.pyplot(fig_p); c3.pyplot(fig_pw)
+
             st.subheader("🎯 Bull’s Eye Map")
             b1, b2 = st.columns(2)
             with b1:
@@ -144,7 +153,7 @@ if video:
                 st.pyplot(fig_be_p)
                 st.markdown(get_high_sectors(arr_p, "Pressure"))
 
-            # -- Summary & Score --
+            # Summary
             st.markdown("### 🧠 Summary")
             with st.expander("WSSとPressureの説明"):
                 st.markdown("- **WSS**：血管壁にかかるずり応力。高値は血管障害を示唆。")
@@ -153,46 +162,23 @@ if video:
             st.markdown(f"- {tw}")
             st.markdown(f"- {tp}")
 
+            # Score
             st.markdown("### 📊 スコア結果")
             wss_max, p_max, wsr, pr, comment = summarize_case(mean_wss, pressures)
             st.markdown(f"- 最大WSS：**{wss_max} Pa**")
             st.markdown(f"- 最大Pressure：**{p_max}**")
             st.markdown(f"- 高WSS時間比率：**{wsr}%**")
             st.markdown(f"- 高Pressure時間比率：**{pr}%**")
+            st.markdown(f"- 総合判定：**{comment}**")
 
-            # Consolidated Color-coded Judgment
-            bar_color = "#dff5e1" if comment == "異常なし" else "#fff6db" if "可能性" in comment else "#ffe5e5"
-            border_color = "#34c759" if comment == "異常なし" else "#e6a23c" if "可能性" in comment else "#ed3f14"
-            st.markdown(f"""
-            <div style="
-              background:{bar_color};
-              border-left:6px solid {border_color};
-              padding:12px 20px;
-              border-radius:8px;
-              font-weight:600;
-              font-size:16px;
-              margin-top:20px;
-            ">
-              総合判定：{comment}
-            </div>""", unsafe_allow_html=True)
+            # CSV Section
+            st.markdown("### 🧾 結果CSV")
+            df_time = time[:len(mean_wss)]
+            df = pd.DataFrame({"Time (s)": df_time, "WSS": mean_wss, "Pressure": pressures[:len(mean_wss)]})
+            st.download_button("CSV ダウンロード", df.to_csv(index=False).encode("utf-8"), "results.csv", "text/csv")
 
-            # High-Frame Section with Severity-based Title Style
-            title_bg = "#0b3d2c" if comment == "異常なし" else "#553d00" if "可能性" in comment else "#5e0a00"
-            title_fg = "#d4fcd2" if comment == "異常なし" else "#fff7cc" if "可能性" in comment else "#ffd7d0"
-
-            st.markdown(f"""
-            <div style="
-              background-color:{title_bg};
-              color:{title_fg};
-              padding:12px 20px;
-              border-radius:8px;
-              margin-top:15px;
-              font-weight:600;
-            ">
-              📸 高値フレーム表示
-            </div>""", unsafe_allow_html=True)
-
-            # Display Frames
+            # 📸 高値フレーム表示
+            st.markdown("### 📸 高値フレーム表示")
             thr_w = np.nanmean(mean_wss) + np.nanstd(mean_wss)
             thr_p = np.nanmean(pressures) + np.nanstd(pressures)
             peaks_w = np.argsort(mean_wss)[-3:][::-1]
@@ -213,16 +199,3 @@ if video:
                         st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
                 else:
                     st.info("該当フレームはありません。")
-
-            # Success Notification
-            st.markdown(f"""
-            <div style="
-              background-color:#0b3d2c;
-              color:#d4fcd2;
-              padding:12px;
-              border-radius:8px;
-              margin-top:15px;
-              font-weight:600;
-            ">
-              ✅ 解析完了！
-            </div>""", unsafe_allow_html=True)
