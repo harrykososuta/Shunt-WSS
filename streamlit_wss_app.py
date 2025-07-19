@@ -221,7 +221,7 @@ if video_file:
             st.markdown(f"<div style='text-align:center; font-size:90%; color:gray;'>🔵 Pressureが最も高かったのは {angle_labels_pressure[np.argmax(sector_means_pressure)]} 方向です。</div>", unsafe_allow_html=True)
 
             st.markdown("---")
-             st.subheader("🧐 Summary")
+            st.subheader("🧐 Summary")
             st.markdown("<div style='background-color: white; padding: 10px; border-radius: 10px;'>", unsafe_allow_html=True)
 
             wss_max, p_max, wss_ratio, p_ratio, comment = summarize_case(mean_wss_wall, pressures)
