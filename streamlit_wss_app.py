@@ -174,12 +174,33 @@ if video:
 
             # Score
             st.markdown("### 📊 スコア結果")
+
+            # スコア取得
             wss_max, p_max, wsr, pr, comment = summarize_case(mean_wss, pressures)
-            st.markdown(f"- 最大WSS：**{wss_max} Pa**")
-            st.markdown(f"- 最大Pressure：**{p_max}**")
-            st.markdown(f"- 高WSS時間比率：**{wsr}%**")
-            st.markdown(f"- 高Pressure時間比率：**{pr}%**")
-            st.markdown(f"- 総合判定：**{comment}**")
+            
+            # 総合判定表示 + 説明ボタン
+            col1, col2 = st.columns([0.85, 0.15])
+            with col1:
+                st.markdown(f"- 総合判定：**{comment}**")
+            with col2:
+                with st.expander("🛈 説明"):
+                    st.write({
+                        "異常なし": "WSS・Pressure共に軽度、明らかなリスクなし。",
+                        "軽度の上昇傾向": "WSS または Pressure のいずれかがやや高い。",
+                        "中等度の上昇傾向": "WSS または Pressure が中程度に高い。",
+                        "WSS極端に高い": "WSS が非常に高く、血管壁への負荷大。",
+                        "Pressure極端に高い": "Pressure が非常に高く、内圧変化大。",
+                        "重度の狭窄の疑い": "WSS・Pressure共に高く、狭窄が強く疑われます。",
+                        "データ不足の可能性あり": "赤領域が検出されず、解析対象が不足している可能性があります。"
+                    }.get(comment, "該当コメントなし"))
+            
+            # 詳細スコアはボタン展開
+            if st.button("📈 詳細スコアを見る"):
+                with st.expander("スコア詳細"):
+                    st.markdown(f"- 最大WSS：**{wss_max} Pa**")
+                    st.markdown(f"- 最大Pressure：**{p_max}**")
+                    st.markdown(f"- 高WSS時間比率：**{wsr}%**")
+                    st.markdown(f"- 高Pressure時間比率：**{pr}%**")
 
             # CSV Section
             st.markdown("### 🧾 結果CSV")
