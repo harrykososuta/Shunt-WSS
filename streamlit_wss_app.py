@@ -220,17 +220,27 @@ if video:
                 st.markdown("　↪ 同時ピークは少なめで、狭窄リスクは低い傾向です。")
 
 
-        # CSV 出力
-        st.markdown("### 📄 結果CSV")
-        df = pd.DataFrame({
-            "Frame": np.arange(len(mean_wss)),
-            "Time_s": time,
-            "WSS": mean_wss,
-            "Pressure": pressures[:len(mean_wss)],
-            "Category": cls['category'],
-            "Rule": cls['rule_used']
-        })
-        st.download_button("CSVとして保存", df.to_csv(index=False).encode("utf-8"), file_name="results.csv", mime="text/csv")
+        # CSV出力部分
+            st.markdown("### 📄 結果CSV")
+            
+            # DataFrame作成
+            df = pd.DataFrame({
+                "Frame": np.arange(len(mean_wss)),
+                "Time (s)": time,
+                "WSS": mean_wss,
+                "Pressure": pressures[:len(mean_wss)]
+            })
+            
+            # BOM付きUTF-8に変換
+            csv_data = df.to_csv(index=False).encode('utf-8-sig')
+            
+            # Downloadボタン
+            st.download_button(
+                label="CSVとして保存",
+                data=csv_data,
+                file_name="results.csv",
+                mime="text/csv"
+            )
 
         # 高値フレーム
         st.markdown("### 📸 高値フレーム表示")
@@ -253,5 +263,6 @@ if video:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
+
 
 
