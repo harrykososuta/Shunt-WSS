@@ -137,11 +137,11 @@ st.set_page_config(page_title="Vessel Analyzer", layout="wide")
 st.title("Vessel Wall Shear Stress & Pressure Analyzer")
 
 video = st.file_uploader("動画をアップロード（MP4）", type="mp4")
-vessel_diameter = st.number_input("血管径（mm）", min_value=0.1, max_value=20.0, value=5.0, step=0.1)
 
 if video:
     st.video(video)
     vmax = st.slider("速度レンジ (cm/s)", 10.0, 120.0, 50.0, step=1.0)
+    
     if st.button("解析を実行"):
         frames = extract_frames(video)
         wss_maps = calculate_wss(frames)
@@ -263,6 +263,7 @@ if video:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
+
 
 
 
