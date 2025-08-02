@@ -189,12 +189,36 @@ if video:
         if cls.get('mild_suspicion_score') is not None:
             st.markdown(f"- Mild suspicion score: **{cls['mild_suspicion_score']:.2f}**")
 
-        with st.expander("🔍 特徴量詳細"):
-            st.write({
-                "Correlation (Pressure vs WSS)": f"{feat['corr_pressure_wss']:.2f} — 0 に近いほど無関係、±1 に近いほど強い線形関係です。",
-                "Lag (WSS lag after Pressure) [s]": f"{feat['lag_sec_wss_after_pressure']:.2f} — 正の値なら WSS が Pressure より後にピークが来ています。",
-                "Simultaneous Peak Count": f"{feat['simultaneous_peak_counts']} — WSS と Pressure のピークが同時に発生した回数（近接）です。"
-            })
+        with st.expander("📊 解析詳細"):
+            corr = feat['corr_pressure_wss']
+            lag = feat['lag_sec_wss_after_pressure']
+            sim = feat['simultaneous_peak_counts']
+        
+            # Correlation解説
+            st.markdown(f"- **Correlation（圧力とWSSの関係性）**: **{corr:.2f}**")
+            if abs(corr) >= 0.7:
+                st.markdown("　↪ 狭窄により圧力とWSSが強く連動している可能性があります。")
+            elif abs(corr) >= 0.3:
+                st.markdown("　↪ やや関係性が見られますが、狭窄以外の要因も影響しているかもしれません。")
+            else:
+                st.markdown("　↪ 関係性は弱く、狭窄の影響は少ないと考えられます。")
+        
+            # Lag解説
+            st.markdown(f"- **Lag（WSSが圧力より遅れる時間）**: **{lag:.2f} 秒**")
+            if lag > 0:
+                st.markdown("　↪ 圧力の後にWSSがピークになる傾向があります。（狭窄の典型的パターン）")
+            else:
+                st.markdown("　↪ WSSが圧力よりも先にピークになっています。（非典型パターン）")
+        
+            # Simultaneous Peaks解説
+            st.markdown(f"- **Simultaneous Peaks（同時に高くなる回数）**: **{sim} 回**")
+            if sim >= 60:
+                st.markdown("　↪ 圧力とWSSが同時に高くなる頻度が高く、狭窄の影響が強いと考えられます。")
+            elif sim >= 40:
+                st.markdown("　↪ やや頻度は多く、狭窄の可能性を示唆します。")
+            else:
+                st.markdown("　↪ 同時ピークは少なめで、狭窄リスクは低い傾向です。")
+
 
         # CSV 出力
         st.markdown("### 📄 結果CSV")
@@ -229,4 +253,5 @@ if video:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
+
 
