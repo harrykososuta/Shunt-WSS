@@ -19,8 +19,9 @@ def extract_red_mask(img):
              cv2.inRange(hsv, np.array([160,70,50]), np.array([180,255,255])))) > 0
 
 def extract_frames(video_file):
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-    tmp.write(video_file.read()); tmp.close()
+    tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    tmp.write(video_file.read())
+    tmp.close()
     cap = cv2.VideoCapture(tmp.name)
     frames = []
     while True:
@@ -116,9 +117,6 @@ vessel_diameter = st.number_input("血管径（mm）", min_value=0.1, value=5.0,
 
 if video:
     st.video(video)
-    fps_cap = cv2.VideoCapture(tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name)
-    # derive duration optionally if needed
-    
     vmax = st.slider("速度レンジ（cm/s）", 10.0, 120.0, 50.0, step=1.0)
 
     if st.button("解析を実行"):
@@ -128,51 +126,56 @@ if video:
         mean_wss = np.array([np.nanmean(w) for w in wss_maps])
         time = np.arange(len(mean_wss)) / frame_rate
 
-        # グラフ① WSS トレンド
+        # グラフ描画
         fig_w, axw = plt.subplots()
         axw.plot(time, mean_wss, color='orange')
         axw.set_xlabel("Time")
         axw.set_title("WSS Trend")
-        st.pyplot(fig_w)
-        max_wss_frame = np.nanargmax(mean_wss)
-        max_wss_time = max_wss_frame / frame_rate
-        st.markdown(f"- 最大WSSは **{max_wss_time:.2f} 秒** 時点で検出されました。")
 
-        # グラフ② Pressure トレンド
         fig_p, axp = plt.subplots()
         axp.plot(time, pressures[:len(mean_wss)], color='blue')
         axp.set_xlabel("Time")
         axp.set_title("Pressure Trend")
-        st.pyplot(fig_p)
-        max_p_frame = np.nanargmax(pressures[:len(mean_wss)])
-        max_p_time = max_p_frame / frame_rate
-        st.markdown(f"- 最大Pressureは **{max_p_time:.2f} 秒** 時点で検出されました。")
 
-        # グラフ③ 同時高値傾向
         fig_pw, axpw = plt.subplots()
         axpw.plot(time, pressures[:len(mean_wss)], color='blue')
         axpw2 = axpw.twinx()
         axpw2.plot(time, mean_wss, color='orange')
         axpw.set_xlabel("Time")
         axpw.set_title("WSS & Pressure Trend")
-        st.pyplot(fig_pw)
 
-        thr_wss, thr_p = np.nanmean(mean_wss)+np.nanstd(mean_wss), np.nanmean(pressures)+np.nanstd(pressures)
-        simul = [i for i in range(len(mean_wss))
-                 if mean_wss[i]>thr_wss and pressures[i]>thr_p]
-        if simul:
-            sim_time = simul[0] / frame_rate
-            st.markdown(f"- WSSとPressureが同時に高くなったのは **{sim_time:.2f} 秒** 時点でした。")
-        else:
-            st.markdown("- WSSとPressureが同時に高くなった瞬間は検出されませんでした。")
+        # 横並び
+        st.subheader("📈 計測グラフ")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.pyplot(fig_w)
+            max_wss_frame = np.nanargmax(mean_wss)
+            st.markdown(f"- 最大WSSは **{max_wss_frame/frame_rate:.2f} 秒** に確認されました。")
+        with col2:
+            st.pyplot(fig_p)
+            max_p_frame = np.nanargmax(pressures[:len(mean_wss)])
+            st.markdown(f"- 最大Pressureは **{max_p_frame/frame_rate:.2f} 秒** に確認されました。")
+        with col3:
+            st.pyplot(fig_pw)
+            thr_wss = np.nanmean(mean_wss) + np.nanstd(mean_wss)
+            thr_p = np.nanmean(pressures[:len(mean_wss)]) + np.nanstd(pressures[:len(mean_wss)])
+            simul = [i for i in range(len(mean_wss)) if mean_wss[i]>thr_wss and pressures[i]>thr_p]
+            if simul:
+                st.markdown(f"- WSSとPressureが同時に高かったのは **{simul[0]/frame_rate:.2f} 秒** です。")
+            else:
+                st.markdown("- WSSとPressureが同時に高くなった瞬間は検出されませんでした。")
 
         # Bull’s Eye Maps
         fig_be_w, arr_w = bullseye_map_highlight(mean_wss[:12], "Bull’s Eye (WSS)", cmap='Blues')
         fig_be_p, arr_p = bullseye_map_highlight(np.array(pressures[:12]), "Bull’s Eye (Pressure)", cmap='Reds')
         st.subheader("🎯 Bull’s Eye Map")
         c1, c2 = st.columns(2)
-        c1.pyplot(fig_be_w); c1.markdown(get_high_sectors(arr_w, "WSS"))
-        c2.pyplot(fig_be_p); c2.markdown(get_high_sectors(arr_p, "Pressure"))
+        with c1:
+            st.pyplot(fig_be_w)
+            st.markdown(get_high_sectors(arr_w, "WSS"))
+        with c2:
+            st.pyplot(fig_be_p)
+            st.markdown(get_high_sectors(arr_p, "Pressure"))
 
         # Summary
         wsr, pr, comment = summarize_case(mean_wss, pressures)
@@ -189,6 +192,7 @@ if video:
                 "データ不足": "赤色マスクが不足している可能性があります。"
             }.get(comment, ""))
 
+        # 詳細スコア
         with st.expander("📊 詳細スコア"):
             st.markdown(f"- 高WSS時間比率：**{wsr}%**")
             st.markdown(f"- 高Pressure時間比率：**{pr}%**")
@@ -198,24 +202,20 @@ if video:
         df = pd.DataFrame({"時間 (s)": time, "WSS": mean_wss, "Pressure": pressures[:len(mean_wss)]})
         st.download_button("CSVとして保存", df.to_csv(index=False).encode("utf-8"), file_name="results.csv", mime="text/csv")
 
-        # High-value frames 展開
+        # High-value Frames
         st.markdown("### 📸 高値フレーム表示")
-        thr_w = np.nanmean(mean_wss) + np.nanstd(mean_wss)
-        thr_p = np.nanmean(pressures[:len(mean_wss)]) + np.nanstd(pressures[:len(mean_wss)])
         peaks_w = np.argsort(mean_wss)[-3:][::-1]
         peaks_p = np.argsort(pressures[:len(mean_wss)])[-3:][::-1]
-
         with st.expander("高WSSフレーム"):
             for i in peaks_w: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
         with st.expander("高Pressureフレーム"):
             for i in peaks_p: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
         with st.expander("同時高値フレーム"):
-            suspects = [i for i in range(len(mean_wss)) if mean_wss[i]>thr_w and pressures[i]>thr_p]
+            suspects = [i for i in range(len(mean_wss)) if mean_wss[i]>thr_wss and pressures[i]>thr_p]
             if suspects:
-                for i in suspects[:3]: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
+                for i in suspects[:3]:
+                    st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
             else:
                 st.info("該当フレームはありません。")
 
         st.success("解析完了！")
-
-
