@@ -116,7 +116,7 @@ vessel_diameter = st.number_input("血管径（mm）", min_value=0.1, value=5.0,
 
 if video:
     st.video(video)
-    fps_cap = cv2.VideoCapture(tempfile.NamedTemporaryFile(delete=False, suffix=".mp4",
+    fps_cap = cv2.VideoCapture(tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name)
         delete=False).name)
     # derive duration optionally if needed
     
@@ -218,3 +218,4 @@ if video:
                 st.info("該当フレームはありません。")
 
         st.success("解析完了！")
+
