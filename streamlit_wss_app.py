@@ -190,13 +190,17 @@ if video:
             st.markdown(f"- Mild suspicion score: **{cls['mild_suspicion_score']:.2f}**")
 
         with st.expander("🔍 特徴量詳細"):
-            st.json(feat)
+            st.write({
+                "Correlation (Pressure vs WSS)": f"{feat['corr_pressure_wss']:.2f} — 0 に近いほど無関係、±1 に近いほど強い線形関係です。",
+                "Lag (WSS lag after Pressure) [s]": f"{feat['lag_sec_wss_after_pressure']:.2f} — 正の値なら WSS が Pressure より後にピークが来ています。",
+                "Simultaneous Peak Count": f"{feat['simultaneous_peak_counts']} — WSS と Pressure のピークが同時に発生した回数（近接）です。"
+            })
 
         # CSV 出力
         st.markdown("### 📄 結果CSV")
         df = pd.DataFrame({
             "Frame": np.arange(len(mean_wss)),
-            "Time (s)": time,
+            "Time_s": time,
             "WSS": mean_wss,
             "Pressure": pressures[:len(mean_wss)],
             "Category": cls['category'],
@@ -225,3 +229,4 @@ if video:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
+
