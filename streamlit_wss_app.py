@@ -67,6 +67,7 @@ def detect_local_peaks(series):
     return peaks
 
 def compute_feature_from_trends(pressure, mean_wss, time):
+    pressure = np.array(pressure)
     valid = ~np.isnan(pressure) & ~np.isnan(mean_wss)
     p, w, t = pressure[valid], mean_wss[valid], time[valid]
     if len(p) < 3:
@@ -218,3 +219,4 @@ if video:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
+
