@@ -88,13 +88,10 @@ def compute_feature_from_trends(pressure, mean_wss, time):
 def classify_stenosis(feat, ref_stats=None):
     sim = feat['simultaneous_peak_counts']
     lag = feat['lag_sec_wss_after_pressure']
-    corr = feat.get('corr_pressure_wss', None)
+    # シンプルなルールに整理
     if sim <= 62.5:
         if lag <= 3.28:
-            if corr is not None and corr <= 0.08:
-                category, rule = "高度狭窄疑い", "sim≤62.5 & lag≤3.28 & corr≤0.08"
-            else:
-                category, rule = "狭窄なし", "sim≤62.5 & lag≤3.28 & corr>0.08"
+            category, rule = "狭窄なし", "sim≤62.5 & lag≤3.28"
         else:
             category, rule = "中等度狭窄疑い", "sim≤62.5 & lag>3.28"
     else:
@@ -104,10 +101,12 @@ def classify_stenosis(feat, ref_stats=None):
             category, rule = "高度狭窄疑い", "sim>62.5 & lag≤8.62"
         else:
             category, rule = "軽度狭窄疑い", "sim>62.5 & lag>8.62"
+    # mild_score 付加判定
     mild_score = None
     if ref_stats:
         z = lambda x, m, s: (x - m) / s if s and s > 0 else 0.0
-        mild_score = z(sim, ref_stats['sim_peak_mean'], ref_stats['sim_peak_std']) + z(lag, ref_stats['lag_mean'], ref_stats['lag_std'])
+        mild_score = z(sim, ref_stats['sim_peak_mean'], ref_stats['sim_peak_std']) + \
+                     z(lag, ref_stats['lag_mean'], ref_stats['lag_std'])
         if category == "狭窄なし" and mild_score > 0.5:
             category = "軽度狭窄疑い（補正）"
             rule += f"; mild_score={mild_score:.2f}>0.5補正"
@@ -229,6 +228,15 @@ if video:
 
             # --- 判定結果の下に区切り線を追加 ---
             st.markdown("---")
+
+            # 解析詳細の解説
+            with st.expander("🔍 解析詳細の解説"):
+                st.markdown(f"- **Correlation (WSS vs Pressure)**: {feat['corr_pressure_wss']:.2f}")
+                st.markdown("  ↪ ±1に近いほど強い連動性を示し、狭窄リスクが高いことを示唆します。")
+                st.markdown(f"- **Lag time**: {feat['lag_sec_wss_after_pressure']:.2f} 秒")
+                st.markdown("  ↪ 圧力後にWSSが遅れるほど狭窄の可能性が高まります。")
+                st.markdown(f"- **Simultaneous peaks**: {feat['simultaneous_peak_counts']} 回")
+                st.markdown("  ↪ ピークの同時発生回数が多いほど、WSSと圧力の連動が強く、狭窄リスクが高いです。")
 
             # CSV Download")
             df = pd.DataFrame({"Frame": np.arange(len(mean_wss)),
