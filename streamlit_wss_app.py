@@ -6,13 +6,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import tempfile
 
-# --- Parameters ---
+# --- パラメータ ---
 mu = 0.0035
 pixel_size_m = 1e-4
 resize_scale = 0.5
 frame_rate = 30.0
 
-# --- Utility Functions ---
+# --- 関数定義 ---
 def extract_red_mask(img):
     hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
     lower1, upper1 = np.array([0,70,50]), np.array([10,255,255])
@@ -84,8 +84,8 @@ def get_high_sectors(arr, label):
     idx = np.where(arr >= thr)[0]
     if idx.size:
         degs = ", ".join(f"{i*30}°" for i in idx)
-        return f"- **{label} Focused Areas:** {degs}"
-    return f"- **{label} Focused Areas:** None"
+        return f"- **{label} 集中部位**: {degs}"
+    return f"- **{label} 集中部位**: なし"
 
 def summarize_case(wss, pressure):
     thw = np.mean(wss) + np.std(wss)
@@ -94,50 +94,50 @@ def summarize_case(wss, pressure):
     hp = np.sum(np.array(pressure) > thp) / len(pressure)
 
     if hw == 0 or hp == 0:
-        comment = "Data insufficient"
+        comment = "データ不足"
     elif hw > 0.25 and hp > 0.25:
-        comment = "Severe stenosis suspicion"
+        comment = "重度の狭窄疑い"
     elif hw > 0.25:
-        comment = "Extremely high WSS"
+        comment = "WSS極端に高い"
     elif hp > 0.25:
-        comment = "Extremely high Pressure"
+        comment = "Pressure極端に高い"
     elif hw > 0.15 or hp > 0.15:
-        comment = "Moderate elevation trend"
+        comment = "中等度の上昇傾向"
     elif hw > 0.10 or hp > 0.10:
-        comment = "Mild elevation trend"
+        comment = "軽度の上昇傾向"
     else:
-        comment = "Normal range"
+        comment = "異常なし"
     return None, None, round(hw*100,1), round(hp*100,1), comment
 
-# --- STREAMLIT UI ---
-st.set_page_config(page_title="Shunt WSS Analyzer", layout="wide")
+# --- Streamlit UI ---
+st.set_page_config(page_title="Vessel Wall Shear Stress & Pressure Analyzer", layout="wide")
 st.title("Vessel Wall Shear Stress & Pressure Analyzer")
 
-video = st.file_uploader("Upload MP4 video", type="mp4")
-vessel_diameter = st.number_input("Vessel Diameter (mm)", min_value=0.1, value=5.0, step=0.1)
+video = st.file_uploader("動画をアップロード（MP4）", type="mp4")
+vessel_diameter = st.number_input("血管径（mm）", min_value=0.1, value=5.0, step=0.1)
 
 if video:
     st.video(video)
-    vmax = st.slider("Velocity Range (cm/s)", 10.0, 120.0, 50.0, step=1.0)
+    vmax = st.slider("速度レンジ（cm/s）", min_value=10.0, max_value=120.0, value=50.0, step=1.0)
 
-    if st.button("Run Analysis"):
-        with st.spinner("Processing..."):
+    if st.button("解析を実行"):
+        with st.spinner("解析中..."):
             frames = extract_frames(video)
             wss_maps = calculate_wss(frames)
             _, pressures = calculate_pressure(frames, vmax)
             mean_wss = np.array([np.nanmean(w) for w in wss_maps])
             time = np.arange(len(pressures)) / frame_rate
 
-            # Graphs (X axis only)
+            # --- グラフ ---
             fig1, ax1 = plt.subplots()
             ax1.plot(time[:len(mean_wss)], mean_wss, color='orange')
             ax1.set_xlabel("Time [s]"); ax1.set_title("WSS Trend")
-            ax1.get_yaxis().set_visible(False); ax1.grid(False)
+            ax1.get_yaxis().set_visible(False)
 
             fig2, ax2 = plt.subplots()
             ax2.plot(time[:len(mean_wss)], pressures[:len(mean_wss)], color='blue')
             ax2.set_xlabel("Time [s]"); ax2.set_title("Pressure Trend")
-            ax2.get_yaxis().set_visible(False); ax2.grid(False)
+            ax2.get_yaxis().set_visible(False)
 
             fig3, ax3 = plt.subplots()
             ax3.plot(time[:len(mean_wss)], pressures[:len(mean_wss)], color='blue')
@@ -147,13 +147,13 @@ if video:
             ax4.plot(time[:len(mean_wss)], mean_wss, color='orange')
             ax4.get_yaxis().set_visible(False)
 
-            st.subheader("📈 Trend Graphs")
+            st.subheader("📈 計測グラフ")
             cols = st.columns(3)
             cols[0].pyplot(fig1)
             cols[1].pyplot(fig2)
             cols[2].pyplot(fig3)
 
-            # Bull's Eye
+            # --- Bull’s Eye ---
             fig_be_w, arr_w = bullseye_map_highlight(mean_wss[:12], "Bull’s Eye (WSS)", cmap='Blues')
             fig_be_p, arr_p = bullseye_map_highlight(np.array(pressures[:12]), "Bull’s Eye (Pressure)", cmap='Reds')
 
@@ -166,48 +166,59 @@ if video:
                 st.pyplot(fig_be_p)
                 st.markdown(get_high_sectors(arr_p, "Pressure"))
 
-            # Summary
-            st.markdown("### 🧠 Summary")
+            # --- Summary ---
+            st.markdown("### 🧠 サマリー")
             _, _, wsr, pr, comment = summarize_case(mean_wss, pressures)
-            st.markdown(f"- Overall Judgment: **{comment}**")
-            with st.expander("🛈 Comment Details"):
+            st.markdown(f"- 総合判定：**{comment}**")
+
+            with st.expander("🛈 コメント説明"):
                 st.write({
-                    "Normal range": "WSS & Pressure trends are within expected ranges.",
-                    "Mild elevation trend": "One of the metrics is slightly elevated.",
-                    "Moderate elevation trend": f"WSS {wsr}%, Pressure {pr}% indicate moderate elevation.",
-                    "Extremely high WSS": "WSS trend shows significant elevation.",
-                    "Extremely high Pressure": "Pressure trend shows significant elevation.",
-                    "Severe stenosis suspicion": "Both WSS & Pressure trends show strong elevations, stenosis suspected.",
-                    "Data insufficient": "Insufficient red flow area detected in video."
+                    "異常なし": "WSS・Pressureは正常範囲内です。",
+                    "軽度の上昇傾向": "WSSまたはPressureが軽度上昇しています。",
+                    "中等度の上昇傾向": f"WSS {wsr}%、Pressure {pr}% に上昇が見られます。",
+                    "WSS極端に高い": "WSSが著しく上昇しています。",
+                    "Pressure極端に高い": "Pressureが著しく上昇しています。",
+                    "重度の狭窄疑い": "WSS・Pressureともに上昇が顕著で、狭窄の可能性が高いです。",
+                    "データ不足": "赤色領域がうまく検出できていない可能性があります。"
                 }.get(comment, ""))
 
-            with st.expander("📊 Score Details"):
-                st.markdown(f"- High WSS Time Ratio: **{wsr}%**")
-                st.markdown(f"- High Pressure Time Ratio: **{pr}%**")
-                st.markdown(f"- Vessel Diameter: **{vessel_diameter} mm**")
+            # --- 詳細スコア ---
+            with st.expander("📊 詳細スコア"):
+                st.markdown(f"- 高WSS時間比率：**{wsr}%**")
+                st.markdown(f"- 高Pressure時間比率：**{pr}%**")
+                st.markdown(f"- 血管径：**{vessel_diameter} mm**")
 
-            # High Frames
-            st.markdown("### 📸 High-Value Frames")
+            # --- CSV 出力 ---
+            st.markdown("### 📄 結果CSV")
+            df_time = time[:len(mean_wss)]
+            df = pd.DataFrame({
+                "時間 (s)": df_time,
+                "WSS": mean_wss,
+                "Pressure": pressures[:len(mean_wss)]
+            })
+            st.download_button("CSVとして保存", df.to_csv(index=False).encode("utf-8"), file_name="results.csv", mime="text/csv")
+
+            # --- 高値フレーム ---
+            st.markdown("### 📸 高値フレーム表示")
             thr_w = np.nanmean(mean_wss) + np.nanstd(mean_wss)
             thr_p = np.nanmean(pressures) + np.nanstd(pressures)
             peaks_w = np.argsort(mean_wss)[-3:][::-1]
             peaks_p = np.argsort(pressures)[-3:][::-1]
 
-            with st.expander("High-WSS Frames"):
+            with st.expander("高WSSフレーム"):
                 for i in peaks_w:
-                    st.image(frames[i], caption=f"{i/frame_rate:.2f} s", use_column_width=True)
+                    st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
 
-            with st.expander("High-Pressure Frames"):
+            with st.expander("高Pressureフレーム"):
                 for i in peaks_p:
-                    st.image(frames[i], caption=f"{i/frame_rate:.2f} s", use_column_width=True)
+                    st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
 
-            with st.expander("Both High Frames"):
+            with st.expander("WSS・Pressure同時高値フレーム"):
                 suspects = [i for i in range(len(mean_wss)) if mean_wss[i] > thr_w and pressures[i] > thr_p]
                 if suspects:
                     for i in suspects[:3]:
-                        st.image(frames[i], caption=f"{i/frame_rate:.2f} s", use_column_width=True)
+                        st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
                 else:
-                    st.info("No frames found with simultaneous WSS and Pressure elevations.")
+                    st.info("該当フレームはありません。")
 
-            st.success("Analysis Complete!")
-
+            st.success("解析完了！")
