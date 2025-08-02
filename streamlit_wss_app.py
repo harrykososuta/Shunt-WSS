@@ -198,9 +198,22 @@ if video:
             st.markdown(f"- 高Pressure時間比率：**{pr}%**")
 
         # CSV
+        # CSV出力部分
         st.markdown("### 📄 結果CSV")
-        df = pd.DataFrame({"時間 (s)": time, "WSS": mean_wss, "Pressure": pressures[:len(mean_wss)]})
-        st.download_button("CSVとして保存", df.to_csv(index=False).encode("utf-8"), file_name="results.csv", mime="text/csv")
+        
+        df = pd.DataFrame({
+            "Frame": np.arange(len(mean_wss)),
+            "Time (s)": time,
+            "WSS": mean_wss,
+            "Pressure": pressures[:len(mean_wss)]
+        })
+        
+        st.download_button(
+            label="CSVとして保存",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name="results.csv",
+            mime="text/csv"
+        )
 
         # High-value Frames
         st.markdown("### 📸 高値フレーム表示")
@@ -219,3 +232,4 @@ if video:
                 st.info("該当フレームはありません。")
 
         st.success("解析完了！")
+
