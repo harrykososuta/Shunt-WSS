@@ -227,8 +227,10 @@ if video:
                 unsafe_allow_html=True
             )
 
-            # CSV Download
-            st.markdown("### 📄 結果CSV")
+            # --- 判定結果の下に区切り線を追加 ---
+            st.markdown("---")
+
+            # CSV Download")
             df = pd.DataFrame({"Frame": np.arange(len(mean_wss)),
                                "Time (s)": time,
                                "WSS": mean_wss,
