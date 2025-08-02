@@ -214,23 +214,23 @@ if video:
                 st.pyplot(fig_be_p)
                 st.markdown(get_high_sectors(arr_p, "Pressure"))
 
-            # 判定ラベル（色付き）
-            color_map = {"狭窄なし": "#ccff90",
-                         "軽度狭窄疑い": "#fff475",
-                         "中等度狭窄疑い": "#ffcc80",
-                         "高度狭窄疑い": "#f28b82"}
-            bg = color_map.get(cls['category'], "#ffffff")
-            st.markdown(
-                f"<div style='background-color:{bg}; padding:10px; border-radius:5px;'>"
-                f"### 🧠 判定結果 → **{cls['category']}**</div>",
-                unsafe_allow_html=True
-            )
+            # Severity Indicator (icon-based)
+            # Use icons instead of background colors
+            severity_icons = {
+                "狭窄なし": "🟢",
+                "軽度狭窄疑い": "🟡",
+                "中等度狭窄疑い": "🟠",
+                "高度狭窄疑い": "🔴",
+                "軽度狭窄疑い（補正）": "🟡"
+            }
+            icon = severity_icons.get(cls['category'], "⚪️")
+            st.markdown(f"### {icon} 判定結果 → **{cls['category']}**")
 
             # --- 判定結果の下に区切り線を追加 ---
             st.markdown("---")
 
             # 解析詳細の解説
-            with st.expander("🔍 解析詳細の解説"):
+            with st.expander("🔍 詳細の解説"):
                 st.markdown(f"- **Correlation (WSS vs Pressure)**: {feat['corr_pressure_wss']:.2f}")
                 st.markdown("  ↪ ±1に近いほど強い連動性を示し、狭窄リスクが高いことを示唆します。")
                 st.markdown(f"- **Lag time**: {feat['lag_sec_wss_after_pressure']:.2f} 秒")
