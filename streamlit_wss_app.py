@@ -186,7 +186,6 @@ if video:
             with st.expander("📊 詳細スコア"):
                 st.markdown(f"- 高WSS時間比率：**{wsr}%**")
                 st.markdown(f"- 高Pressure時間比率：**{pr}%**")
-                st.markdown(f"- 血管径：**{vessel_diameter} mm**")
 
             # --- CSV 出力 ---
             st.markdown("### 📄 結果CSV")
@@ -222,3 +221,4 @@ if video:
                     st.info("該当フレームはありません。")
 
             st.success("解析完了！")
+
