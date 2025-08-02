@@ -1,8 +1,11 @@
 # streamlit_app.py
 import streamlit as st
-import cv2, numpy as np, math, pandas as pd
+import cv2
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import tempfile
+import math
 from scipy.signal import correlate
 
 # --- パラメータ ---
@@ -65,7 +68,7 @@ def detect_local_peaks(series):
 
 def compute_feature_from_trends(pressure, mean_wss, time):
     valid = ~np.isnan(pressure) & ~np.isnan(mean_wss)
-    p,w,t = pressure[valid], mean_wss[valid], time[valid]
+    p, w, t = pressure[valid], mean_wss[valid], time[valid]
     if len(p) < 3:
         return {'corr_pressure_wss': np.nan,
                 'lag_sec_wss_after_pressure': np.nan,
@@ -80,45 +83,47 @@ def compute_feature_from_trends(pressure, mean_wss, time):
             'simultaneous_peak_counts': sim}
 
 def classify_stenosis(feat, ref_stats=None):
-    sim, lag = feat['simultaneous_peak_counts'], feat['lag_sec_wss_after_pressure']
+    sim = feat['simultaneous_peak_counts']
+    lag = feat['lag_sec_wss_after_pressure']
     corr = feat.get('corr_pressure_wss', None)
     if sim <= 62.5:
         if lag <= 3.28:
             if corr is not None and corr <= 0.08:
-                category, rule = "高度狭窄疑い", "sim<=62.5 & lag<=3.28 & corr<=0.08"
+                category, rule = "高度狭窄疑い", "sim≤62.5 & lag≤3.28 & corr≤0.08"
             else:
-                category, rule = "狭窄なし", "sim<=62.5 & lag<=3.28 & corr>0.08"
+                category, rule = "狭窄なし", "sim≤62.5 & lag≤3.28 & corr>0.08"
         else:
-            category, rule = "中等度狭窄疑い", "sim<=62.5 & lag>3.28"
+            category, rule = "中等度狭窄疑い", "sim≤62.5 & lag>3.28"
     else:
         if lag <= 2.28:
-            category, rule = "軽度狭窄疑い", "sim>62.5 & lag<=2.28"
+            category, rule = "軽度狭窄疑い", "sim>62.5 & lag≤2.28"
         elif lag <= 8.62:
-            category, rule = "高度狭窄疑い", "sim>62.5 & 2.28<lag<=8.62"
+            category, rule = "高度狭窄疑い", "sim>62.5 &2.28<lag≤8.62"
         else:
-            category, rule = "軽度狭窄疑い", "sim>62.5 & lag>8.62 exception"
+            category, rule = "軽度狭窄疑い", "sim>62.5 & lag>8.62"
     mild_score = None
     if ref_stats:
         z = lambda x,m,s: (x-m)/s if s and s>0 else 0.0
-        mild_score = z(sim, ref_stats['sim_peak_mean'], ref_stats['sim_peak_std']) + \
-                      z(lag, ref_stats['lag_mean'], ref_stats['lag_std'])
+        mild_score = z(sim, ref_stats['sim_peak_mean'], ref_stats['sim_peak_std']) + z(lag, ref_stats['lag_mean'], ref_stats['lag_std'])
         if category == "狭窄なし" and mild_score > 0.5:
             category = "軽度狭窄疑い（補正）"
-            rule += f"; mild_score={mild_score:.2f}>0.5補正"
-    return {'category': category, 'rule_used': rule, 'mild_suspicion_score': mild_score}
+    return category, rule, mild_score
 
 def bullseye_map_highlight(vals, title, cmap='jet'):
-    sectors = 12; arr = np.array(vals)
-    if arr.size < sectors: arr = np.pad(arr, (0, sectors-arr.size), constant_values=np.nan)
+    sectors = 12
+    arr = np.array(vals)
+    if arr.size < sectors:
+        arr = np.pad(arr, (0, sectors-arr.size), constant_values=np.nan)
     thr = np.nanmean(arr) + np.nanstd(arr)
     fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(4,4))
-    width = 2*np.pi/sectors
+    width = 2 * np.pi / sectors
     for i, v in enumerate(arr):
-        theta = i*width
+        theta = i * width
         color = 'white' if np.isnan(v) or v<thr else plt.get_cmap(cmap)(
-            (v-np.nanmin(arr))/(np.nanmax(arr)-np.nanmin(arr)+1e-6))
-        ax.bar(theta, 0.2, width=width, bottom=0.8, color=color, edgecolor='black', linewidth=0.8)
-    ax.set_xticks(np.linspace(0,2*np.pi,sectors,endpoint=False))
+               (v - np.nanmin(arr)) / (np.nanmax(arr) - np.nanmin(arr) + 1e-6))
+        ax.bar(theta, 0.2, width=width, bottom=0.8,
+               color=color, edgecolor='black', linewidth=0.8)
+    ax.set_xticks(np.linspace(0, 2*np.pi, sectors, endpoint=False))
     ax.set_xticklabels([f"{i*30}°" for i in range(sectors)])
     ax.set_yticks([]); ax.set_title(title)
     ax.set_theta_zero_location("N"); ax.set_theta_direction(-1)
@@ -137,133 +142,79 @@ st.set_page_config(page_title="Vessel Analyzer", layout="wide")
 st.title("Vessel Wall Shear Stress & Pressure Analyzer")
 
 video = st.file_uploader("動画をアップロード（MP4）", type="mp4")
-
 if video:
     st.video(video)
     vmax = st.slider("速度レンジ (cm/s)", 10.0, 120.0, 50.0, step=1.0)
-    
+
     if st.button("解析を実行"):
-        frames = extract_frames(video)
-        wss_maps = calculate_wss(frames)
-        pressures = calculate_pressure(frames, vmax)
-        mean_wss = np.array([np.nanmean(w) for w in wss_maps])
-        time = np.arange(len(mean_wss)) / frame_rate
+        with st.spinner("解析中...しばらくお待ちください"):
+            frames = extract_frames(video)
+            wss_maps = calculate_wss(frames)
+            pressures = calculate_pressure(frames, vmax)
+            mean_wss = np.array([np.nanmean(w) for w in wss_maps])
+            time = np.arange(len(mean_wss)) / frame_rate
 
-        feat = compute_feature_from_trends(np.array(pressures[:len(mean_wss)]), mean_wss, time)
-        ref = {"sim_peak_mean":50.0,"sim_peak_std":15.0,"lag_mean":1.5,"lag_std":1.0}
-        cls = classify_stenosis(feat, ref)
+            feat = compute_feature_from_trends(pressures[:len(mean_wss)], mean_wss, time)
+            ref_stats = {"sim_peak_mean":50.0, "sim_peak_std":15.0, "lag_mean":1.5, "lag_std":1.0}
+            category, rule, mild_score = classify_stenosis(feat, ref_stats)
 
-        # プロット
-        fig_w, axw = plt.subplots(); axw.plot(time, mean_wss, color='orange'); axw.set_xlabel("Time"); axw.set_title("WSS Trend")
-        fig_p, axp = plt.subplots(); axp.plot(time, pressures[:len(mean_wss)], color='blue'); axp.set_xlabel("Time"); axp.set_title("Pressure Trend")
-        fig_pw, axpw = plt.subplots(); axpw.plot(time, pressures[:len(mean_wss)], color='blue'); axpw2 = axpw.twinx(); axpw2.plot(time, mean_wss, color='orange'); axpw.set_xlabel("Time"); axpw.set_title("WSS & Pressure Trend")
+        # グラフ描画
+        fig_w, axw = plt.subplots(); axw.plot(time, mean_wss, color='orange'); axw.set_title("WSS Trend"); axw.set_xlabel("Time")
+        fig_p, axp = plt.subplots(); axp.plot(time, pressures[:len(mean_wss)], color='blue'); axp.set_title("Pressure Trend"); axp.set_xlabel("Time")
+        fig_pw, axpw = plt.subplots(); axpw.plot(time, pressures[:len(mean_wss)], color='blue'); axpw2 = axpw.twinx(); axpw2.plot(time, mean_wss, color='orange'); axpw.set_title("WSS & Pressure Trend"); axpw.set_xlabel("Time")
 
         st.subheader("📈 計測グラフ")
-        c1,c2,c3 = st.columns(3)
-        with c1:
-            st.pyplot(fig_w)
-            st.markdown(f"- 最大WSS時: **{np.nanargmax(mean_wss)/frame_rate:.2f} 秒**")
-        with c2:
-            st.pyplot(fig_p)
-            st.markdown(f"- 最大Pressure時: **{np.nanargmax(pressures[:len(mean_wss)])/frame_rate:.2f} 秒**")
+        c1, c2, c3 = st.columns(3)
+        with c1: st.pyplot(fig_w); st.markdown(f"- 最大WSS時: **{np.nanargmax(mean_wss)/frame_rate:.2f} 秒**")
+        with c2: st.pyplot(fig_p); st.markdown(f"- 最大Pressure時: **{np.nanargmax(pressures[:len(mean_wss)])/frame_rate:.2f} 秒**")
         with c3:
             st.pyplot(fig_pw)
-            st.markdown(f"- 同時ピーク分類: **{cls['category']}**")
-            st.markdown(f"  ルール: {cls['rule_used']}")
+            color_map = {"狭窄なし":"#ccff90","軽度狭窄疑い":"#fff475","中等度狭窄疑い":"#ffcc80","高度狭窄疑い":"#f28b82"}
+            col = color_map.get(category, "#ffffff")
+            st.markdown(f"<div style='background-color:{col}; padding:8px; border-radius:5px;'>**判定: {category}**</div>", unsafe_allow_html=True)
+            st.markdown(f"- 判定ルール: {rule}")
 
         # Bull’s Eye
-        fig_be_w, arr_w = bullseye_map_highlight(mean_wss[:12], "Bull’s Eye (WSS)", "Blues")
-        fig_be_p, arr_p = bullseye_map_highlight(np.array(pressures[:12]), "Bull’s Eye (Pressure)", "Reds")
+        fig_be_w, arr_w = bullseye_map_highlight(mean_wss[:12], "Bull’s Eye (WSS)", cmap='Blues')
+        fig_be_p, arr_p = bullseye_map_highlight(pressures[:12], "Bull’s Eye (Pressure)", cmap='Reds')
         st.subheader("🎯 Bull’s Eye Map")
-        b1,b2 = st.columns(2)
-        with b1:
-            st.pyplot(fig_be_w)
-            st.markdown(get_high_sectors(arr_w, "WSS"))
-        with b2:
-            st.pyplot(fig_be_p)
-            st.markdown(get_high_sectors(arr_p, "Pressure"))
+        b1, b2 = st.columns(2)
+        with b1: st.pyplot(fig_be_w); st.markdown(get_high_sectors(arr_w, "WSS"))
+        with b2: st.pyplot(fig_be_p); st.markdown(get_high_sectors(arr_p, "Pressure"))
 
-        # 判定結果
-        st.markdown("### 🧠 判定結果")
-        st.markdown(f"- カテゴリ: **{cls['category']}**")
-        if cls.get('mild_suspicion_score') is not None:
-            st.markdown(f"- Mild suspicion score: **{cls['mild_suspicion_score']:.2f}**")
+        # 解説付き特徴量詳細
+        st.markdown("### 🔍 解析解説")
+        corr = feat['corr_pressure_wss']; lag = feat['lag_sec_wss_after_pressure']; sim = feat['simultaneous_peak_counts']
+        st.markdown(f"- Correlation：**{corr:.2f}**  ↪ 圧力とWSSが「同時に高くなる傾向」を示します。")
+        st.markdown(f"- Lag：**{lag:.2f} 秒**  ↪ WSSが圧力より遅れてピーク → 狭窄に多く見られます。")
+        st.markdown(f"- Simultaneous Peaks：**{sim} 回**  ↪ 同時ピークの回数。多いほど狭窄リスク高め。")
 
-        with st.expander("📊 解析詳細"):
-            corr = feat['corr_pressure_wss']
-            lag = feat['lag_sec_wss_after_pressure']
-            sim = feat['simultaneous_peak_counts']
-        
-            # Correlation解説
-            st.markdown(f"- **Correlation（圧力とWSSの関係性）**: **{corr:.2f}**")
-            if abs(corr) >= 0.7:
-                st.markdown("　↪ 狭窄により圧力とWSSが強く連動している可能性があります。")
-            elif abs(corr) >= 0.3:
-                st.markdown("　↪ やや関係性が見られますが、狭窄以外の要因も影響しているかもしれません。")
-            else:
-                st.markdown("　↪ 関係性は弱く、狭窄の影響は少ないと考えられます。")
-        
-            # Lag解説
-            st.markdown(f"- **Lag（WSSが圧力より遅れる時間）**: **{lag:.2f} 秒**")
-            if lag > 0:
-                st.markdown("　↪ 圧力の後にWSSがピークになる傾向があります。（狭窄の典型的パターン）")
-            else:
-                st.markdown("　↪ WSSが圧力よりも先にピークになっています。（非典型パターン）")
-        
-            # Simultaneous Peaks解説
-            st.markdown(f"- **Simultaneous Peaks（同時に高くなる回数）**: **{sim} 回**")
-            if sim >= 60:
-                st.markdown("　↪ 圧力とWSSが同時に高くなる頻度が高く、狭窄の影響が強いと考えられます。")
-            elif sim >= 40:
-                st.markdown("　↪ やや頻度は多く、狭窄の可能性を示唆します。")
-            else:
-                st.markdown("　↪ 同時ピークは少なめで、狭窄リスクは低い傾向です。")
+        # CSV 出力（常時表示）
+        st.markdown("### 📄 結果CSV")
+        df = pd.DataFrame({
+            "Frame": np.arange(len(mean_wss)),
+            "Time_s": time,
+            "WSS": mean_wss,
+            "Pressure": pressures[:len(mean_wss)],
+            "Category": category,
+            "Rule": rule
+        })
+        csv_data = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("CSVとして保存", data=csv_data, file_name="results.csv", mime="text/csv")
 
-
-        # CSV出力部分
-            st.markdown("### 📄 結果CSV")
-            
-            # DataFrame作成
-            df = pd.DataFrame({
-                "Frame": np.arange(len(mean_wss)),
-                "Time (s)": time,
-                "WSS": mean_wss,
-                "Pressure": pressures[:len(mean_wss)]
-            })
-            
-            # BOM付きUTF-8に変換
-            csv_data = df.to_csv(index=False).encode('utf-8-sig')
-            
-            # Downloadボタン
-            st.download_button(
-                label="CSVとして保存",
-                data=csv_data,
-                file_name="results.csv",
-                mime="text/csv"
-            )
-
-        # 高値フレーム
+        # 高値フレーム表示
         st.markdown("### 📸 高値フレーム表示")
-        thr_wss = np.nanmean(mean_wss) + np.nanstd(mean_wss)
-        thr_p = np.nanmean(pressures[:len(mean_wss)]) + np.nanstd(pressures[:len(mean_wss)])
         peaks_w = np.argsort(mean_wss)[-3:][::-1]
         peaks_p = np.argsort(pressures[:len(mean_wss)])[-3:][::-1]
         with st.expander("高WSSフレーム"):
-            for i in peaks_w:
-                st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
+            for i in peaks_w: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
         with st.expander("高Pressureフレーム"):
-            for i in peaks_p:
-                st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
+            for i in peaks_p: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
         with st.expander("同時高値フレーム"):
-            suspects = [i for i in range(len(mean_wss)) if mean_wss[i] > thr_wss and pressures[i] > thr_p]
+            suspects = [i for i in range(len(mean_wss)) if mean_wss[i] > (np.nanmean(mean_wss)+np.nanstd(mean_wss)) and pressures[i] > (np.nanmean(pressures[:len(mean_wss)])+np.nanstd(pressures[:len(mean_wss)]))]
             if suspects:
-                for i in suspects[:3]:
-                    st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
+                for i in suspects[:3]: st.image(frames[i], caption=f"{i/frame_rate:.2f} 秒", use_column_width=True)
             else:
                 st.info("該当フレームなし")
 
         st.success("解析完了！")
-
-
-
-
